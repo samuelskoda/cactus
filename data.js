@@ -1,0 +1,151 @@
+/*
+ * Cactus collection data.
+ * One entry per specimen. Edit freely — the website reads this file.
+ *
+ * Fields:
+ *   id        STABLE slug, independent of the photo filename. Used for QR deep-links
+ *             (page.html#id). Keep it fixed even when you reshoot and swap the photo.
+ *   file      image filename (same folder). Safe to change after a reshoot.
+ *   name      best-guess accepted / likely species
+ *   tag       exactly what the handwritten pot tag says
+ *   genus     ARRAY of genera for the "browse by genus" filter. Usually one; a mixed
+ *             bowl lists every genus planted in it, so it shows up under each. The
+ *             special value "Mixed & offshoots" flags multi-plant bowls (shown first, styled apart).
+ *   region    ARRAY of regions: "Mexico & SW USA", "Andes", "Southern South America".
+ *   origin    native range (free text, shown on the card)
+ *   blurb     description
+ *   uncertain true if the ID is doubtful (shown with a "?" badge)
+ */
+
+// Genus -> Wikipedia article. Shown as a link in the detail view.
+window.GENUS_WIKI = {
+  "Espostoa":       "https://en.wikipedia.org/wiki/Espostoa",
+  "Coryphantha":    "https://en.wikipedia.org/wiki/Coryphantha",
+  "Astrophytum":    "https://en.wikipedia.org/wiki/Astrophytum",
+  "Echinopsis":     "https://en.wikipedia.org/wiki/Echinopsis",
+  "Mammillaria":    "https://en.wikipedia.org/wiki/Mammillaria",
+  "Stenocactus":    "https://en.wikipedia.org/wiki/Stenocactus",
+  "Ferocactus":     "https://en.wikipedia.org/wiki/Ferocactus",
+  "Parodia":        "https://en.wikipedia.org/wiki/Parodia",
+  "Gymnocalycium":  "https://en.wikipedia.org/wiki/Gymnocalycium",
+  "Kroenleinia":    "https://en.wikipedia.org/wiki/Kroenleinia",
+  "Cumulopuntia":   "https://en.wikipedia.org/wiki/Cumulopuntia",
+  "Disocactus":     "https://en.wikipedia.org/wiki/Disocactus"
+  // "Bowls & dish gardens" is a grouping, not a genus — no Wikipedia link.
+};
+
+window.CACTI = [
+  { id: "espostoa-melanostele", file: "IMG_9481.jpeg", name: "Espostoa melanostele", tag: "Espostoa melanostele", genus: ["Espostoa"], region: ["Andes"], origin: "Peru (Andes)",
+    blurb: "A slow-growing columnar cactus from the Peruvian Andes, wrapped head to foot in dense white wool and fine hair-like spines that shade it from fierce high-altitude sun. Over many years it builds a tall silvery column and, when mature, a woolly flowering cephalium with nocturnal white-pink blooms. Wants bright light and a very free-draining mix." },
+
+  { id: "coryphantha-cornifera", file: "IMG_9482.jpeg", name: "Coryphantha cornifera", tag: "Coryphantha cornifera", genus: ["Coryphantha"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A solitary blue-green globe studded with fat conical tubercles, each carrying a single downward-curved 'horn' central spine — hence cornifera. In summer it opens large, satiny yellow flowers at the crown. A tough Mexican highland plant that wants full sun, warmth and a completely dry winter rest." },
+
+  { id: "astrophytum-asterias", file: "IMG_9483.jpeg", name: "Astrophytum asterias", tag: "Astrophytum asterias", genus: ["Astrophytum"], region: ["Mexico & SW USA"], origin: "N Mexico & S Texas",
+    blurb: "The famous spineless 'sand dollar' cactus — a low, flattened disc divided into neat ribbed segments and dusted with tiny white woolly flecks. It bears big yellow flowers with an orange-red throat. Slow, coveted and a little fussy: give it gritty soil, sun and cautious watering to avoid rot." },
+
+  { id: "echinopsis-ancistrophora-1", file: "IMG_9484.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina & Bolivia",
+    blurb: "A small, unassuming green globe with soft white areoles that hides a spectacular trick: it throws large, funnel-shaped flowers far bigger than the plant itself, often opening at dusk. Quick and easy from an Andean-foothill species. (Lobivia is now folded into Echinopsis.)" },
+
+  { id: "mammillaria-spinosissima", file: "IMG_9485.jpeg", name: "Mammillaria spinosissima", tag: "Mammillaria spinosissima", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A cylindrical pincushion so densely clothed in fine radiating spines that the body almost vanishes beneath them — the 'very spiny' Mammillaria. In spring a tidy ring of deep-pink flowers encircles the woolly crown. Undemanding given sun and sharp drainage." },
+
+  { id: "stenocactus-multicostatus", file: "IMG_9486.jpeg", name: "Stenocactus multicostatus", tag: "Stenocactus multicostatus", genus: ["Stenocactus"], region: ["Mexico & SW USA"], origin: "N & Central Mexico",
+    blurb: "The classic 'brain cactus', its small body pleated into dozens of thin, crowded, wavy ribs. Pale flowers with a purple midstripe sit low on the crown in late winter. A hardy, easy Mexican species that appreciates a cool, dry winter." },
+
+  { id: "echinopsis-aurea", file: "IMG_9487.jpeg", name: "Echinopsis aurea", tag: "Echinopsis aurea", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina",
+    blurb: "A small clustering cactus armed with stiff radial spines and topped, in season, by brilliant golden-yellow flowers that look outsized for the plant. From the dry hills of central Argentina; free-flowering and easy in sun.", uncertain: true },
+
+  { id: "astrophytum-myriostigma-1", file: "IMG_9488.jpeg", name: "Astrophytum myriostigma", tag: "Astrophytum myriostigma", genus: ["Astrophytum"], region: ["Mexico & SW USA"], origin: "N Mexico",
+    blurb: "The 'bishop's cap' — a spineless body of a few broad, clean ribs entirely powdered with tiny white scales that give it a marbled, silvery look. This is the paler of the two specimens. Glossy yellow flowers rise from the crown in summer." },
+
+  { id: "astrophytum-myriostigma-2", file: "IMG_9489.jpeg", name: "Astrophytum myriostigma", tag: "Astrophytum myriostigma", genus: ["Astrophytum"], region: ["Mexico & SW USA"], origin: "N Mexico",
+    blurb: "A second bishop's cap, greener-bodied with woolly areoles running down the rib edges. Reliable cup-shaped yellow flowers in summer. Spineless and sculptural — grown for its geometry rather than its spines." },
+
+  { id: "mammillaria-karwinskiana", file: "IMG_9490.jpeg", name: "Mammillaria karwinskiana", tag: "Mammillaria karwinskiana", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "S Mexico (Oaxaca)",
+    blurb: "A green pincushion with stiff, pale spines that grows by splitting its own head in two (dichotomous division), slowly building a characterful clump. Cream flowers edged red-brown open in a ring, followed by red seed pods. Easy in sun." },
+
+  { id: "ferocactus-sp", file: "IMG_9491.jpeg", name: "Ferocactus sp.", tag: "Echinocereus emoryi", genus: ["Ferocactus"], region: ["Mexico & SW USA"], origin: "Mexico / SW USA",
+    blurb: "A stout, ribbed barrel cactus with heavy spines, caught here in bud — most likely a Ferocactus rather than the Echinocereus written on its tag, though young plants of both can look alike. Ferocactus grow slowly into big, sun-loving barrels. The exact identity is still unsettled.", uncertain: true },
+
+  { id: "stenocactus-crispatus", file: "IMG_9492.jpeg", name: "Stenocactus crispatus", tag: "Stenocactus crispatus", genus: ["Stenocactus"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "Another wavy-ribbed Stenocactus, this one armed with longer, flattened, upright spines that arch over the crown. Small purple-striped flowers appear in late winter. Tough and forgiving with a cool, dry rest." },
+
+  { id: "parodia-leninghausii-1", file: "IMG_9493.jpeg", name: "Parodia leninghausii", tag: "Parodia leninghausii", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
+    blurb: "The 'golden ball' or 'lemon ball' cactus — a soft-looking globe bristling with fine golden spines that turns columnar with age. Older plants crown themselves with lemon-yellow flowers. Easy, fast and cheerful; it enjoys more water than most cacti in growth." },
+
+  { id: "parodia-leninghausii-2", file: "IMG_9494.jpeg", name: "Parodia leninghausii", tag: "Parodia leninghausii", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
+    blurb: "A second golden ball, caught with a fat yellow bud pushing out of the woolly crown. The gentle golden spines are soft to the touch. Give it bright light and regular summer watering for best flowering." },
+
+  { id: "mammillaria-compressa-1", file: "IMG_9495.jpeg", name: "Mammillaria compressa", tag: "Mammillaria compressa", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "'Mother of hundreds' — angular tubercles and long white spines on heads that offset freely into broad, dense mounds. Small purple-pink flowers ring the crown in spring. Almost indestructible; a great beginner's clumper." },
+
+  { id: "kroenleinia-grusonii-1", file: "IMG_9496.jpeg", name: "Kroenleinia grusonii", tag: "Kroenleinia grusonii", genus: ["Kroenleinia"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A young golden barrel, its ribs already lined with dense, translucent golden spines. Famously slow — this small plant is the start of the show-piece 'golden barrel', and the big mature one elsewhere in the collection shows where it's heading. Long known as Echinocactus grusonii." },
+
+  { id: "stenocactus-coptonogonus", file: "IMG_9497.jpeg", name: "Stenocactus coptonogonus", tag: "Stenocactus coptonogonus", genus: ["Stenocactus"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "The odd one out among Stenocactus: instead of many wavy ribs it has fewer, straight, sharp-edged ribs and stout curved spines. White flowers striped magenta open in late winter. A distinctive, collectable Mexican species." },
+
+  { id: "parodia-erubescens", file: "IMG_9498.jpeg", name: "Parodia × erubescens", tag: "Parodia × erubescens", genus: ["Parodia"], region: ["Southern South America"], origin: "S America (garden hybrid)",
+    blurb: "A ribbed green globe with reddish spines, here pushing out a bright bud. The tag records it as the hybrid Parodia × erubescens — the × marks it as a cross rather than a wild species. Parodias are generous, easy flowerers that like brighter light and a touch more water than desert cacti." },
+
+  { id: "coryphantha-elephantidens", file: "IMG_9499.jpeg", name: "Coryphantha elephantidens", tag: "Coryphantha elephantidens", genus: ["Coryphantha"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A fat, glossy dark-green plant with big rounded tubercles that give it its name — the 'elephant's tooth' cactus. From a woolly crown it opens large, silky pink flowers in late summer. Wants warmth, sun and a dry winter." },
+
+  { id: "mammillaria-compressa-2", file: "IMG_9500.jpeg", name: "Mammillaria compressa", tag: "— (tag not legible; identified by owner)", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A broad, low clump of many heads bristling with white, hooked spines — a second Mammillaria compressa grown on into a wide mound. Free-clumping and very easy; small pink flowers ring the top in spring." },
+
+  { id: "gymnocalycium-saglionis-1", file: "IMG_9501.jpeg", name: "Gymnocalycium saglionis", tag: "Gymnocalycium (saglionis?)", genus: ["Gymnocalycium"], region: ["Southern South America"], origin: "N Argentina",
+    blurb: "A grey-green 'chin cactus' with broad tubercles and strong, curved spines. Gymnocalyciums tolerate a little more shade than most cacti and open naked-tubed flowers (the name means 'naked calyx'). Matches the labelled saglionis nearby, though this tag is hard to read.", uncertain: true },
+
+  { id: "echinopsis-ancistrophora-2", file: "IMG_9502.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina & Bolivia",
+    blurb: "A second plant under the ancistrophora label — a ribbed globe with spines pressed close to the body and, in season, big pale funnel flowers on long tubes. Quick and easy in sun." },
+
+  { id: "mammillaria-matudae", file: "IMG_9503.jpeg", name: "Mammillaria matudae", tag: "Mammillaria matudae", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico (Guerrero)",
+    blurb: "The 'thumb cactus' — slender stems that elongate, lean over and offset, neatly sheathed in white radial spines. Small pink flowers form rings near the tips. Fast and easy, and happy to trail over a pot edge." },
+
+  { id: "echinopsis-oxygona-1", file: "IMG_9504.jpeg", name: "Echinopsis oxygona", tag: "Echinopsis oxygona", genus: ["Echinopsis"], region: ["Southern South America"], origin: "S Brazil / Uruguay / Argentina",
+    blurb: "The classic 'Easter lily cactus' — a ribbed green globe that clusters freely and produces enormous, fragrant pink flowers on long tubes, usually opening overnight. Vigorous, hardy and forgiving; a pass-along favourite for good reason." },
+
+  { id: "gymnocalycium-saglionis-2", file: "IMG_9505.jpeg", name: "Gymnocalycium saglionis", tag: "Gymnocalycium saglionis", genus: ["Gymnocalycium"], region: ["Southern South America"], origin: "N Argentina",
+    blurb: "A large, solitary globe with broad tubercles and stout, curved spines — a well-grown chin cactus. Small pink-white flowers ring the top in summer. Slow but very long-lived and undemanding." },
+
+  { id: "mammillaria-hahniana", file: "IMG_9506.jpeg", name: "Mammillaria hahniana", tag: "Mammillaria hahniana", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "The 'old lady cactus' — a globe wrapped in long white hairs and short spines that give it a soft, whiskery look. A ring of deep magenta flowers crowns it in spring. Loves sun; keep the hairs dry to stay white." },
+
+  { id: "mammillaria-bombycina", file: "IMG_9507.jpeg", name: "Mammillaria bombycina", tag: "Mammillaria bombycina", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A clustering pincushion with silky white spines and hooked amber central spines, building neat mounds of heads. Bright pink flowers ring the crowns in spring. Attractive year-round for its spine pattern alone." },
+
+  { id: "echinopsis-ancistrophora-3", file: "IMG_9508.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina & Bolivia",
+    blurb: "A third specimen carrying the ancistrophora label — a dark-green ribbed body that offsets at the base and opens large, showy flowers well beyond its size. Easy, quick and free-flowering in full sun." },
+
+  { id: "parodia-magnifica-1", file: "IMG_9509.jpeg", name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
+    blurb: "The 'ball cactus' — a green ribbed body edged in soft golden spines, with a woolly crown and sulphur-yellow flowers. The soft golden bristles make the ID a little ambiguous: it may instead be Parodia leninghausii, its close golden-ball relative. Either way it likes bright light and summer water. (One of two magnifica specimens.)", uncertain: true },
+
+  { id: "parodia-magnifica-2", file: "IMG_9513.jpeg", name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
+    blurb: "The second 'ball cactus' of the collection — a green ribbed body clothed in soft golden spines with a woolly crown. Like its companion, the soft golden bristles leave room for it to be Parodia leninghausii instead. Bright light and summer water suit it.", uncertain: true },
+
+  { id: "mammillaria-vetula", file: "IMG_9510.jpeg", name: "Mammillaria vetula", tag: "— (tag not legible; identified by owner)", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A dense mat of tiny cylindrical 'thimble' heads in fine white spines; the little offsets detach at the lightest touch and root wherever they land. Small cream flowers dot the mound in spring. Charming, fast and almost too easy to propagate." },
+
+  { id: "mammillaria-elongata", file: "IMG_9511.jpeg", name: "Mammillaria elongata", tag: "Mammillaria elongata", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "The 'ladyfinger cactus' — mounds of slender, finger-like stems laced with interlocking golden spines. It forms a big, spreading clump over time and carries small cream-to-yellow flowers. Undemanding and quick; a reliable, decorative filler." },
+
+  { id: "mixed-dish-bowl", file: "IMG_9514.jpeg", name: "Mixed seedling dish", tag: "— (dish planting)",
+    genus: ["Mixed & offshoots", "Kroenleinia", "Mammillaria", "Echinopsis", "Coryphantha"],
+    region: ["Mexico & SW USA", "Southern South America"], origin: "Mexico & S America",
+    blurb: "A shallow bowl grown up with six young cacti together: a golden barrel (Kroenleinia grusonii), a silky Mammillaria bombycina, an Echinopsis ancistrophora and three Coryphantha elephantidens. A living sampler that mixes Mexican and South American species in one dish — so it's listed here under each of its members' genera and regions." },
+
+  { id: "disocactus-ackermannii", file: "IMG_9515.jpeg", name: "Disocactus ackermannii", tag: "Disocactus ackermannii", genus: ["Disocactus"], region: ["Mexico & SW USA"], origin: "SE Mexico (forests)",
+    blurb: "An 'orchid cactus' — here a rooting cutting of flat, notched, strap-like stems. Unlike the desert species around it, this is a forest epiphyte that grows on trees; it repays humidity, some shade and richer soil with large, brilliant red day-flowers." },
+
+  { id: "cumulopuntia-boliviana", file: "IMG_9516.jpeg", name: "Cumulopuntia boliviana", tag: "Cumulopuntia boliviana", genus: ["Cumulopuntia"], region: ["Andes"], origin: "Bolivia / Peru / Argentina (Andes)",
+    blurb: "A high-altitude jointed cactus from the Andes that builds low, tight chains of knobbly segments armed with papery, flexible spines. Slow and very cold-hardy in habitat; it wants sharp drainage and lots of sun, with small yellow-orange flowers in summer." },
+
+  { id: "echinopsis-oxygona-bowl", file: "IMG_9517.jpeg", name: "Echinopsis oxygona", tag: "— (no tag; identified by owner)",
+    genus: ["Mixed & offshoots", "Echinopsis"], region: ["Southern South America"], origin: "S Brazil / Uruguay / Argentina",
+    blurb: "An outdoor bowl brimming with clustering Easter lily cactus (Echinopsis oxygona) pups — hardy, free-flowering garden survivors that erupt with huge, fragrant pink flowers in early summer. Tough enough to live in the ground here." },
+
+  { id: "kroenleinia-grusonii-2", file: "IMG_9518.jpeg", name: "Kroenleinia grusonii", tag: "— (no tag; identified by owner)", genus: ["Kroenleinia"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+    blurb: "A mature 'golden barrel' — a big, near-spherical ribbed body armoured in dense golden spines, the show-piece 'mother-in-law's cushion'. Decades in the making and endangered in the wild, though widely grown. Full sun and a dry winter keep it fat and firm." }
+];
