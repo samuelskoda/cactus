@@ -140,6 +140,15 @@
       background:rgba(20,18,12,.55);color:#fff;font-size:1.4rem;display:flex;align-items:center;justify-content:center}
   }
   footer{color:var(--muted);font-size:.8rem;text-align:center;padding:30px 20px 50px;border-top:1px solid var(--line)}
+  /* touch devices: neutralise hover styles so they don't "stick" after a tap */
+  @media (hover: none){
+    .searchclose:hover{color:var(--muted)}
+    .filterbtn:hover{border-color:var(--line)}
+    .chip:hover{opacity:1}
+    .card:hover{transform:none;box-shadow:var(--shadow)}
+    .badge.click:hover{opacity:1}
+    .xref:hover{border-bottom-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+  }
 </style>
 </head>
 <body>
