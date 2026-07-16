@@ -49,8 +49,8 @@ window.CACTI = [
   { id: "astrophytum-asterias", file: "photos/astrophytum-asterias/IMG_9483.jpeg", name: "Astrophytum asterias", tag: "Astrophytum asterias", genus: ["Astrophytum"], region: ["Mexico & SW USA"], origin: "N Mexico & S Texas",
     blurb: "The famous spineless 'sand dollar' cactus — a low, flattened disc divided into neat ribbed segments and dusted with tiny white woolly flecks. It bears big yellow flowers with an orange-red throat. Slow, coveted and a little fussy: give it gritty soil, sun and cautious watering to avoid rot." },
 
-  { id: "echinopsis-ancistrophora-1", file: "photos/echinopsis-ancistrophora-1/IMG_9484.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina & Bolivia",
-    blurb: "A small, unassuming green globe with soft white areoles that hides a spectacular trick: it throws large, funnel-shaped flowers far bigger than the plant itself, often opening at dusk. Quick and easy, from the dry scrub of northern Argentina and Bolivia. (Lobivia is now folded into Echinopsis.)" },
+  { id: "echinopsis-ancistrophora-1", file: "photos/echinopsis-ancistrophora-1/IMG_9484.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Andes"], origin: "Argentina & Bolivia (E Andes)",
+    blurb: "A small, unassuming green globe with soft white areoles that hides a spectacular trick: it throws large, funnel-shaped flowers far bigger than the plant itself, often opening at dusk. Quick and easy, from the eastern Andean foothills of Bolivia and northern Argentina. (Lobivia is now folded into Echinopsis.)" },
 
   { id: "mammillaria-spinosissima", file: "photos/mammillaria-spinosissima/IMG_9485.jpeg", name: "Mammillaria spinosissima", tag: "Mammillaria spinosissima", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
     blurb: "A cylindrical pincushion so densely clothed in fine radiating spines that the body almost vanishes beneath them — the 'very spiny' Mammillaria. In spring a tidy ring of deep-pink flowers encircles the woolly crown. Undemanding given sun and sharp drainage." },
@@ -103,7 +103,7 @@ window.CACTI = [
   { id: "gymnocalycium-saglionis-1", file: "photos/gymnocalycium-saglionis-1/IMG_9501.jpeg", name: "Gymnocalycium saglionis", tag: "Gymnocalycium saglionis", genus: ["Gymnocalycium"], region: ["Southern South America"], origin: "N Argentina",
     blurb: "A grey-green 'chin cactus' with broad tubercles and strong, curved spines. Gymnocalyciums tolerate a little more shade than most cacti and open naked-tubed flowers (the name means 'naked calyx'). Slow, tough and long-lived — the smaller of the two saglionis here." },
 
-  { id: "echinopsis-ancistrophora-2", file: "photos/echinopsis-ancistrophora-2/IMG_9502.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina & Bolivia",
+  { id: "echinopsis-ancistrophora-2", file: "photos/echinopsis-ancistrophora-2/IMG_9502.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Andes"], origin: "Argentina & Bolivia (E Andes)",
     blurb: "A second ancistrophora — a ribbed globe with spines pressed close to the body and, in season, big pale funnel flowers on long tubes. Quick and easy in sun." },
 
   { id: "mammillaria-matudae", file: "photos/mammillaria-matudae/IMG_9503.jpeg", name: "Mammillaria matudae", tag: "Mammillaria matudae", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico (Guerrero)",
@@ -139,7 +139,7 @@ window.CACTI = [
   { id: "mixed-dish-bowl", file: "photos/mixed-dish-bowl/IMG_9514.jpeg", name: "Mixed seedling dish", tag: "— (dish planting)",
     genus: ["Mixed & offshoots", "Kroenleinia", "Mammillaria", "Echinopsis", "Coryphantha"],
     species: ["Kroenleinia grusonii", "Mammillaria bombycina", "Echinopsis ancistrophora", "Coryphantha elephantidens"],
-    region: ["Mexico & SW USA", "Southern South America"], origin: "Mexico & S America",
+    region: ["Mexico & SW USA", "Andes"], origin: "Mexico & S America",
     blurb: "A shallow bowl grown up with six young cacti together: a golden barrel (Kroenleinia grusonii), a silky Mammillaria bombycina, an Echinopsis ancistrophora and three Coryphantha elephantidens. A living sampler that mixes Mexican and South American species in one dish — so it's listed here under each of its members' genera and regions." },
 
   { id: "disocactus-ackermannii", file: "photos/disocactus-ackermannii/IMG_9515.jpeg", name: "Disocactus ackermannii", tag: "Disocactus ackermannii", genus: ["Disocactus"], region: ["Mexico & SW USA"], origin: "SE Mexico (forests)",

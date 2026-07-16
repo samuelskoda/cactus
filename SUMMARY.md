@@ -34,9 +34,10 @@ but on the website they also appear under each genus planted in them.
 ## By region of origin
 - **Mexico & SW USA** — the majority: all Mammillaria, Stenocactus, Astrophytum,
   Coryphantha, Kroenleinia, Ferocactus, and the Disocactus.
-- **Southern South America** (Argentina / Brazil / Uruguay) — the Echinopsis/Lobivia,
+- **Southern South America** (Argentina / Brazil / Uruguay) — Echinopsis (aurea, oxygona),
   Parodia and Gymnocalycium.
-- **Andes** (Peru / Bolivia) — Espostoa melanostele, Cumulopuntia boliviana, Matucana aureiflora.
+- **Andes** (Peru / Bolivia / NW Argentina) — Espostoa melanostele, Cumulopuntia boliviana,
+  Matucana aureiflora, and Echinopsis ancistrophora (eastern Andean foothills).
 
 ## Full specimen list
 
