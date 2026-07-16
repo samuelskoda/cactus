@@ -6,7 +6,7 @@ description, and its genus/region, and you can browse by genus or region or sear
 ## Files
 - `index.html` — the site (self-contained; plain HTML/CSS/JS, no build step)
 - `data.js` — the collection data; edit this to add plants or fix names/descriptions
-- `IMG_*.jpeg` — the photos
+- `photos/` — the photos (`photos/IMG_*.jpeg`)
 - `SUMMARY.md` — a written summary of the collection and open ID questions
 
 ## Running locally

@@ -31,20 +31,26 @@
   .stat b{display:block;font-size:1.5rem;color:var(--accent);line-height:1}
   .stat span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
-  .controls{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:26px}
-  .controls .wrap{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-  .search{width:100%;max-width:520px}
-  .search input{width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:10px;
-    background:var(--panel);color:var(--ink);font-size:.95rem}
-  .facet{width:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-start}
+  /* Region + Genus: normal flow, scroll away with the page */
+  .filters{padding:14px 0 8px}
+  /* Search: the only sticky element, on its own full-width line below the filters */
+  .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:26px}
+  .search{width:100%}
+  .search input{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:10px;
+    background:var(--panel);color:var(--ink);font-size:.9rem}
+  /* Region + Genus flow together on one wrapping line */
+  .facets{width:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .facet{display:contents}
   .facet .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:2px}
+  #genusFacet .lbl{margin-left:12px}
   .chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);
     padding:6px 11px;border-radius:999px;font-size:.82rem;cursor:pointer;white-space:nowrap}
   .chip:hover{border-color:var(--accent)}
   .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  /* the "Mixed" grouping chip — same colour as the rest; only the dashed border sets it apart */
-  .chip.special{border-style:dashed;border-color:var(--muted)}
+  /* the "Mixed & offshoots" grouping chip — same colour as the rest; only the dashed border sets it apart */
+  .chip.special{border-style:dashed;border-color:var(--line)}
+  .chip.special:hover{border-color:var(--accent)}
 
   .count{color:var(--muted);font-size:.85rem;margin:0 0 14px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-bottom:60px}
@@ -56,11 +62,18 @@
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .card .body{padding:12px 13px 14px}
   .card .sci{font-style:italic;font-weight:600;font-size:.98rem;margin:0 0 3px}
+  .card .sci.plain{font-style:normal}
   .card .meta{font-size:.76rem;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
   .badge{display:inline-block;font-size:.66rem;padding:2px 7px;border-radius:999px;
     background:var(--accent-soft);color:var(--accent);border:1px solid transparent}
   .badge.q{background:#f4e7c9;color:#8a6d1f;border-color:#e6d199}
-  @media (prefers-color-scheme:dark){.badge.q{background:#3a3320;color:#d8b95a;border-color:#5a4e28}}
+  .badge.m{background:#dbe7f6;color:#345d92;border-color:#bcd0ea}
+  .badge.r{background:#e6e3dc;color:#5a564d;border-color:#d2cdc2}
+  @media (prefers-color-scheme:dark){
+    .badge.q{background:#3a3320;color:#d8b95a;border-color:#5a4e28}
+    .badge.m{background:#26313f;color:#8fb2df;border-color:#3c4c64}
+    .badge.r{background:#33302a;color:#b7b0a2;border-color:#464036}
+  }
 
   /* modal */
   .modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
@@ -71,11 +84,14 @@
   .sheet img{width:100%;height:100%;max-height:90vh;object-fit:cover;background:var(--sand)}
   .sheet .info{padding:26px 26px 30px;position:relative}
   .sheet h2{font-style:italic;margin:.1em 0 .1em;font-size:1.4rem}
-  .sheet .tagline{color:var(--muted);font-size:.86rem;margin-bottom:16px}
+  .sheet h2.plain{font-style:normal}
+  .sheet .tagline{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
+  .sheet .tags{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+  .badge.click{cursor:pointer}
+  .badge.click:hover{opacity:.78}
   .kv{margin:14px 0;border-top:1px solid var(--line);padding-top:14px}
   .kv div{display:flex;gap:10px;font-size:.9rem;margin:5px 0}
   .kv .k{color:var(--muted);min-width:74px}
-  .tagnote{color:var(--muted);font-size:.82rem}
   .close{position:absolute;top:12px;right:14px;border:none;background:transparent;font-size:1.6rem;
     color:var(--muted);cursor:pointer;line-height:1}
   .qr{margin-top:18px;font-size:.78rem;color:var(--muted);border:1px dashed var(--line);
@@ -91,7 +107,7 @@
     <h1>🌵 My Cactus Collection</h1>
     <p>A photo catalogue of the potted cacti. Browse by genus or by region of origin, or search by name. Tap any plant for details.</p>
     <div class="stats">
-      <div class="stat"><b id="s-total">–</b><span>Photos</span></div>
+      <div class="stat"><b id="s-total">–</b><span>Plants</span></div>
       <div class="stat"><b id="s-species">–</b><span>Species</span></div>
       <div class="stat"><b id="s-genera">–</b><span>Genera</span></div>
       <div class="stat"><b id="s-regions">–</b><span>Regions</span></div>
@@ -99,11 +115,17 @@
   </div>
 </header>
 
-<div class="controls">
+<div class="filters">
+  <div class="wrap">
+    <div class="facets">
+      <div class="facet" id="regionFacet"><span class="lbl">Region</span></div>
+      <div class="facet" id="genusFacet"><span class="lbl">Genus</span></div>
+    </div>
+  </div>
+</div>
+<div class="searchbar">
   <div class="wrap">
     <div class="search"><input id="q" type="search" placeholder="Search name, region, genus…" aria-label="Search"></div>
-    <div class="facet" id="regionFacet"><span class="lbl">Region</span></div>
-    <div class="facet" id="genusFacet"><span class="lbl">Genus</span></div>
   </div>
 </div>
 
@@ -117,7 +139,7 @@
 </div>
 
 <footer class="wrap">
-  Identifications follow the handwritten pot tags (originally via the PlantNet app) and are best-effort — a few, marked <span class="badge q">tentative</span>, may be off.
+  Identifications are best-effort and not authoritative — some, marked <span class="badge q">tentative</span>, are uncertain and may be wrong.
 </footer>
 
 <script src="data.js"></script>
@@ -133,8 +155,9 @@
   // ---- stats
   document.getElementById('s-total').textContent = data.length;
   document.getElementById('s-species').textContent =
-    uniq(data.map(d=>d.name.replace(/\s*\(.*\)/,'')).filter(n=>!/^Mixed|sp\.$/.test(n))).length;
+    uniq(data.map(d=>d.name.replace(/\s*\(.*\)/,'')).filter(n=>!/^Mixed|sp\.$|offshoots/i.test(n))).length;
   const SPECIAL = "Mixed & offshoots";              // grouping tag, not a real genus
+  const isMixed = d => asArr(d.genus).includes(SPECIAL);
   const allGenera  = uniq(data.flatMap(d=>asArr(d.genus)));
   const allRegions = uniq(data.flatMap(d=>asArr(d.region)));
   document.getElementById('s-genera').textContent  = allGenera.filter(g=>g!==SPECIAL).length;
@@ -152,7 +175,7 @@
   // genera sorted, but the "Mixed" grouping pinned first and styled apart
   const genera = allGenera.filter(g=>g!==SPECIAL).sort();
   buildFacet(document.getElementById('regionFacet'), allRegions, 'region');
-  buildFacet(document.getElementById('genusFacet'), allGenera.includes(SPECIAL)?[SPECIAL,...genera]:genera, 'genus');
+  buildFacet(document.getElementById('genusFacet'), allGenera.includes(SPECIAL)?[...genera, SPECIAL]:genera, 'genus');
 
   function syncChips(){
     document.querySelectorAll('#regionFacet .chip').forEach(c=>c.classList.toggle('on',c.dataset.val===state.region));
@@ -175,13 +198,17 @@
     return `<article class="card" onclick="openModal('${d.id}')">
       <div class="thumb"><img loading="lazy" src="${d.file}" alt="${d.name}"></div>
       <div class="body">
-        <p class="sci">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}</p>
-        <div class="meta"><span class="badge">${asArr(d.genus)[0]}</span><span>${d.origin}</span></div>
+        <p class="sci${isMixed(d)?' plain':''}">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}</p>
+        <div class="meta"><span>${d.origin}</span></div>
       </div>
     </article>`;
   }
   function render(){
-    const list=data.filter(match);
+    const list=data.filter(match).sort((a,b)=>{
+      const am=isMixed(a), bm=isMixed(b);
+      if(am!==bm) return am?1:-1;               // Mixed & offshoots always last
+      return a.name.localeCompare(b.name);      // otherwise alphabetical by name
+    });
     grid.innerHTML=list.map(card).join('') || '<p class="count">No plants match those filters.</p>';
     document.getElementById('count').textContent =
       `${list.length} of ${data.length} plants` +
@@ -192,26 +219,42 @@
   const modal=document.getElementById('modal'), sheet=document.getElementById('sheet');
   const cleanName = n => n.replace(/\s*\(.*\)/,'').trim();
   function genusLinks(d){
-    return asArr(d.genus).map(g=>
+    return asArr(d.genus).filter(g=>g!==SPECIAL).map(g=>
       wiki[g] ? `<a href="${wiki[g]}" target="_blank" rel="noopener">${g}</a>` : g
     ).join(' · ');
   }
   // Wikipedia article for the species itself (null for "sp."/mixed/non-binomials)
   function speciesWiki(d){
     const c = cleanName(d.name);
-    if(/\bsp\.|Mixed|dish|×/i.test(c)) return null;   // no article for genus-only / mixed / hybrids
+    if(/\bsp\.|Mixed|dish|×|offshoots/i.test(c)) return null;   // no article for genus-only / mixed / hybrids / grouping names
     const parts = c.split(/\s+/);
     if(parts.length < 2) return null;
     return "https://en.wikipedia.org/wiki/" + parts.slice(0,2).join("_");
   }
   function speciesCell(d){
-    const url = speciesWiki(d);
-    const label = url ? `<a href="${url}" target="_blank" rel="noopener"><em>${d.name}</em></a>` : d.name;
-    // show the handwritten pot tag when it says something different (e.g. an old synonym)
-    const hasTag = d.tag && !/^\s*—/.test(d.tag);
-    const note = hasTag && cleanName(d.tag).toLowerCase() !== cleanName(d.name).toLowerCase()
-      ? ` <span class="tagnote">· pot tag reads “${d.tag}”</span>` : '';
-    return label + note;
+    const list = (d.species && d.species.length) ? d.species : [d.name];
+    return list.map(s=>{
+      const url = speciesWiki({name:s});
+      return url ? `<a href="${url}" target="_blank" rel="noopener"><em>${s}</em></a>` : s;
+    }).join(' · ');
+  }
+  const escAttr = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  // all filter tags on one line, ordered: blue Mixed, grey Region, green Genus, yellow tentative
+  function allTags(d){
+    const genera = asArr(d.genus);
+    const blue   = genera.filter(g=>g===SPECIAL).map(g=>`<span class="badge m click" data-genus="${escAttr(g)}">${g}</span>`);
+    const grey   = asArr(d.region).map(r=>`<span class="badge r click" data-region="${escAttr(r)}">${r}</span>`);
+    const green  = genera.filter(g=>g!==SPECIAL).map(g=>`<span class="badge click" data-genus="${escAttr(g)}">${g}</span>`);
+    const yellow = d.uncertain ? ['<span class="badge q">tentative</span>'] : [];
+    return [...blue, ...grey, ...green, ...yellow].join(' ');
+  }
+  function filterGenus(g){
+    state.genus = g; syncChips(); render(); closeModal();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function filterRegion(r){
+    state.region = r; syncChips(); render(); closeModal();
+    window.scrollTo({top:0, behavior:'smooth'});
   }
   function openModal(id){
     const d=data.find(x=>x.id===id); if(!d) return;
@@ -220,17 +263,19 @@
       <img src="${d.file}" alt="${d.name}">
       <div class="info">
         <button class="close" onclick="closeModal()" aria-label="Close">×</button>
-        <h2>${d.name}</h2>
-        <div class="tagline">${d.uncertain?'<span class="badge q">tentative ID</span> ':''}${genusLinks(d)} · ${asArr(d.region).join(' + ')}</div>
+        <h2${isMixed(d)?' class="plain"':''}>${d.name}</h2>
+        <div class="tags">${allTags(d)}</div>
         <p>${d.blurb}</p>
         <div class="kv">
           <div><span class="k">Species</span><span>${speciesCell(d)}</span></div>
           <div><span class="k">Genus</span><span>${genusLinks(d)}</span></div>
           <div><span class="k">Origin</span><span>${d.origin}</span></div>
-          <div><span class="k">Photo</span><span>${d.file}</span></div>
+          <div><span class="k">Tag</span><span>#${d.id}</span></div>
+          <div><span class="k">Photo</span><span>${d.file.replace(/^photos\//,'')}</span></div>
         </div>
-        <div class="qr"><code>#${d.id}</code></div>
       </div>`;
+    sheet.querySelectorAll('[data-genus]').forEach(el=>{ el.onclick=()=>filterGenus(el.dataset.genus); });
+    sheet.querySelectorAll('[data-region]').forEach(el=>{ el.onclick=()=>filterRegion(el.dataset.region); });
     modal.classList.add('open');
   }
   function closeModal(){ modal.classList.remove('open'); if(location.hash) history.replaceState(null,'',location.pathname); }
