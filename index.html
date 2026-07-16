@@ -50,6 +50,11 @@
   .filterbtn:hover{border-color:var(--accent)}
   .filterbtn .chev{font-size:1.15em;line-height:1;transition:transform .15s ease}
   .filterbtn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+  /* reserve the bold width so the button doesn't resize when a filter is active */
+  .filterbtn .flabel{display:inline-flex;flex-direction:column}
+  .filterbtn .flabel::after{content:"Filter";font-weight:700;height:0;overflow:hidden;visibility:hidden}
+  .filterbtn.active{color:var(--accent)}
+  .filterbtn.active .flabel{font-weight:700}
   /* the dropdown: floats over the content instead of pushing it down */
   .filterpanel{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
     width:min(680px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;
@@ -158,7 +163,7 @@
         <input id="q" type="text" placeholder="Search…" aria-label="Search">
         <button class="searchclose" id="searchClose" type="button" aria-label="Clear search">×</button>
       </div>
-      <button class="filterbtn" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel">Filters<span class="chev">▾</span></button>
+      <button class="filterbtn" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel"><span class="flabel">Filter</span><span class="chev">▾</span></button>
       <div class="filterpanel" id="filterPanel">
         <div class="facets">
           <div class="facet" id="regionFacet"></div>
@@ -276,6 +281,7 @@
     document.getElementById('count').textContent =
       `${list.length} of ${data.length} plants` +
       (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'') + (state.tentative?' · Tentative':'');
+    document.getElementById('filterToggle').classList.toggle('active', !!(state.region||state.genus||state.tentative));
   }
 
   // ---- modal
