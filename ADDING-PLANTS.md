@@ -49,6 +49,8 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
   ```
 - **A hybrid** (name contains `×`) or a **genus-only / grouping name** (`sp.`, "dish",
   "offshoots") gets no species Wikipedia link automatically — that's intentional.
+- **A species with no Wikipedia article** → add its name to `window.NO_WIKI` (top of
+  `data.js`) so it shows as plain text instead of a dead link.
 - **A mixed bowl / multi-plant pot** → put `"Mixed & offshoots"` first in `genus`, then each
   member genus, and add a `species` array listing the plants inside:
   ```js

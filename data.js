@@ -36,6 +36,9 @@ window.GENUS_WIKI = {
   // "Bowls & dish gardens" is a grouping, not a genus — no Wikipedia link.
 };
 
+// Species whose Wikipedia article doesn't exist — shown as plain text, no link.
+window.NO_WIKI = ["Cumulopuntia boliviana"];
+
 window.CACTI = [
   { id: "espostoa-melanostele", file: "photos/espostoa-melanostele/IMG_9481.jpeg", name: "Espostoa melanostele", tag: "Espostoa melanostele", genus: ["Espostoa"], region: ["Andes"], origin: "Peru (Andes)",
     blurb: "A slow-growing columnar cactus from the Peruvian Andes, wrapped head to foot in dense white wool and fine hair-like spines that shade it from fierce high-altitude sun. Over many years it builds a tall silvery column and, when mature, a woolly flowering cephalium with nocturnal white-pink blooms. Wants bright light and a very free-draining mix." },
@@ -47,7 +50,7 @@ window.CACTI = [
     blurb: "The famous spineless 'sand dollar' cactus — a low, flattened disc divided into neat ribbed segments and dusted with tiny white woolly flecks. It bears big yellow flowers with an orange-red throat. Slow, coveted and a little fussy: give it gritty soil, sun and cautious watering to avoid rot." },
 
   { id: "echinopsis-ancistrophora-1", file: "photos/echinopsis-ancistrophora-1/IMG_9484.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Southern South America"], origin: "Argentina & Bolivia",
-    blurb: "A small, unassuming green globe with soft white areoles that hides a spectacular trick: it throws large, funnel-shaped flowers far bigger than the plant itself, often opening at dusk. Quick and easy from an Andean-foothill species. (Lobivia is now folded into Echinopsis.)" },
+    blurb: "A small, unassuming green globe with soft white areoles that hides a spectacular trick: it throws large, funnel-shaped flowers far bigger than the plant itself, often opening at dusk. Quick and easy, from the dry scrub of northern Argentina and Bolivia. (Lobivia is now folded into Echinopsis.)" },
 
   { id: "mammillaria-spinosissima", file: "photos/mammillaria-spinosissima/IMG_9485.jpeg", name: "Mammillaria spinosissima", tag: "Mammillaria spinosissima", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
     blurb: "A cylindrical pincushion so densely clothed in fine radiating spines that the body almost vanishes beneath them — the 'very spiny' Mammillaria. In spring a tidy ring of deep-pink flowers encircles the woolly crown. Undemanding given sun and sharp drainage." },

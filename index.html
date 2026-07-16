@@ -122,7 +122,7 @@
     border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
   .xref:hover{border-bottom-color:var(--accent)}
   /* desktop: top-right of the info panel; mobile (below) becomes a fixed floating corner button */
-  .close{position:absolute;top:10px;right:12px;z-index:70;border:none;background:transparent;
+  .close{position:absolute;top:14px;right:16px;z-index:70;border:none;background:transparent;
     color:var(--muted);font-size:1.7rem;line-height:1;cursor:pointer;padding:0 4px}
   .close:hover{color:var(--ink)}
   .qr{margin-top:18px;font-size:.78rem;color:var(--muted);border:1px dashed var(--line);
@@ -131,7 +131,7 @@
   @media (max-width:640px){
     .sheet{grid-template-columns:1fr}
     .sheet img{max-height:44vh}
-    .close{position:fixed;top:14px;right:14px;width:34px;height:34px;border-radius:50%;padding:0;
+    .close{position:fixed;top:20px;right:20px;width:34px;height:34px;border-radius:50%;padding:0;
       background:rgba(20,18,12,.55);color:#fff;font-size:1.4rem;display:flex;align-items:center;justify-content:center}
   }
   footer{color:var(--muted);font-size:.8rem;text-align:center;padding:30px 20px 50px;border-top:1px solid var(--line)}
@@ -287,9 +287,11 @@
     ).join(' · ');
   }
   // Wikipedia article for the species itself (null for "sp."/mixed/non-binomials)
+  const noWiki = window.NO_WIKI || [];
   function speciesWiki(d){
     const c = cleanName(d.name);
     if(/\bsp\.|Mixed|dish|×|offshoots/i.test(c)) return null;   // no article for genus-only / mixed / hybrids / grouping names
+    if(noWiki.includes(c)) return null;                          // known non-existent articles
     const parts = c.split(/\s+/);
     if(parts.length < 2) return null;
     return "https://en.wikipedia.org/wiki/" + parts.slice(0,2).join("_");
@@ -375,7 +377,7 @@
   // field × just clears the search text
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
-    render(); searchInput.focus();
+    render(); searchInput.blur();
   });
 
   render();
