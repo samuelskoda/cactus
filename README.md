@@ -8,6 +8,7 @@ description, and its genus/region, and you can browse by genus or region or sear
 - `data.js` — the collection data; edit this to add plants or fix names/descriptions
 - `photos/` — the photos (`photos/IMG_*.jpeg`)
 - `SUMMARY.md` — a written summary of the collection and open ID questions
+- `ADDING-PLANTS.md` — step-by-step checklist for adding a new plant to `data.js`
 
 ## Running locally
 Because browsers block `file://` for some features, serve the folder over HTTP:
