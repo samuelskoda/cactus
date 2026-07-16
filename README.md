@@ -6,7 +6,7 @@ description, and its genus/region, and you can browse by genus or region or sear
 ## Files
 - `index.html` — the site (self-contained; plain HTML/CSS/JS, no build step)
 - `data.js` — the collection data; edit this to add plants or fix names/descriptions
-- `photos/` — the photos (`photos/IMG_*.jpeg`)
+- `photos/` — one folder per plant, named by its tag/id (e.g. `photos/astrophytum-myriostigma-1/IMG_9488.jpeg`), ready to hold multiple photos per plant
 - `SUMMARY.md` — a written summary of the collection and open ID questions
 - `ADDING-PLANTS.md` — step-by-step checklist for adding a new plant to `data.js`
 

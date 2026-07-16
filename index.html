@@ -23,34 +23,57 @@
   a{color:var(--accent)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
-  header.hero{padding:44px 20px 30px;text-align:center;
+  header.hero{padding:44px 20px 16px;text-align:center;
     background:linear-gradient(180deg,var(--accent-soft),transparent);}
   .hero h1{margin:0 0 6px;font-size:2rem;letter-spacing:-.5px}
   .hero p{margin:0 auto;max-width:640px;color:var(--muted)}
-  .stats{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+  .stats{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-top:16px}
   .stat b{display:block;font-size:1.5rem;color:var(--accent);line-height:1}
   .stat span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
-  /* Region + Genus: normal flow, scroll away with the page */
-  .filters{padding:14px 0 8px}
-  /* Search: the only sticky element, on its own full-width line below the filters */
+  /* Sticky search bar; the filter chips live in a dropdown that expands from the search field */
   .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:26px}
-  .search{width:100%}
-  .search input{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:10px;
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:26px}
+  .searchbox{position:relative;width:min(340px,100%);margin:0 auto}
+  .searchbox input{width:100%;padding:9px 30px 9px 12px;border:1px solid var(--line);border-radius:10px;
     background:var(--panel);color:var(--ink);font-size:.9rem}
-  /* Region + Genus flow together on one wrapping line */
+  .searchbox.open input{border-color:var(--accent)}
+  /* the × replaces the arrow, and appears (clickable) only while the dropdown is open */
+  .searchclose{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;
+    border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;padding:2px 6px}
+  .searchclose:hover{color:var(--ink)}
+  .searchbox.hastext .searchclose{display:block}      /* field × just clears the text */
+  /* the expanding dropdown: floats over the content instead of pushing it down */
+  .filterpanel{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+    width:min(680px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:14px 30px 14px 16px;z-index:30;display:none}
+  .filterpanel.open{display:block}
+  /* dropdown close × — same style as the field ×, pinned to the top-right corner */
+  .panelclose{position:absolute;top:6px;right:8px;border:none;background:transparent;
+    color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;padding:2px 6px}
+  .panelclose:hover{color:var(--ink)}
   .facets{width:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .facet{display:contents}
   .facet .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:2px}
-  #genusFacet .lbl{margin-left:12px}
-  .chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);
-    padding:6px 11px;border-radius:999px;font-size:.82rem;cursor:pointer;white-space:nowrap}
-  .chip:hover{border-color:var(--accent)}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  /* the "Mixed & offshoots" grouping chip — same colour as the rest; only the dashed border sets it apart */
-  .chip.special{border-style:dashed;border-color:var(--line)}
-  .chip.special:hover{border-color:var(--accent)}
+  #genusFacet .lbl, #otherFacet .lbl{margin-left:12px}
+  .chip{border:1px solid transparent;padding:2px 7px;border-radius:999px;font-size:.66rem;
+    cursor:pointer;white-space:nowrap;background:var(--panel);color:var(--ink)}
+  /* colour-coded to match the detail-view tags: grey region, green genus, blue Mixed */
+  .chip.c-region   {background:#e6e3dc;color:#5a564d;border-color:#d2cdc2}
+  .chip.c-genus    {background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 32%,transparent)}
+  .chip.c-mixed    {background:#dbe7f6;color:#345d92;border-color:#bcd0ea}
+  .chip.c-tentative{background:#f4e7c9;color:#8a6d1f;border-color:#e6d199}
+  .chip:hover{opacity:.8}
+  .chip.on{color:#fff}
+  .chip.c-region.on   {background:#6b665b;border-color:#6b665b;color:#fff}
+  .chip.c-genus.on    {background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.c-mixed.on    {background:#3a6aa5;border-color:#3a6aa5;color:#fff}
+  .chip.c-tentative.on{background:#b8901f;border-color:#b8901f;color:#fff}
+  @media (prefers-color-scheme:dark){
+    .chip.c-region{background:#33302a;color:#b7b0a2;border-color:#464036}
+    .chip.c-mixed {background:#26313f;color:#8fb2df;border-color:#3c4c64}
+    .chip.c-tentative{background:#3a3320;color:#d8b95a;border-color:#5a4e28}
+  }
 
   .count{color:var(--muted);font-size:.85rem;margin:0 0 14px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-bottom:60px}
@@ -65,7 +88,7 @@
   .card .sci.plain{font-style:normal}
   .card .meta{font-size:.76rem;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
   .badge{display:inline-block;font-size:.66rem;padding:2px 7px;border-radius:999px;
-    background:var(--accent-soft);color:var(--accent);border:1px solid transparent}
+    background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
   .badge.q{background:#f4e7c9;color:#8a6d1f;border-color:#e6d199}
   .badge.m{background:#dbe7f6;color:#345d92;border-color:#bcd0ea}
   .badge.r{background:#e6e3dc;color:#5a564d;border-color:#d2cdc2}
@@ -92,6 +115,9 @@
   .kv{margin:14px 0;border-top:1px solid var(--line);padding-top:14px}
   .kv div{display:flex;gap:10px;font-size:.9rem;margin:5px 0}
   .kv .k{color:var(--muted);min-width:74px}
+  .xref{color:var(--accent);text-decoration:none;cursor:pointer;
+    border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+  .xref:hover{border-bottom-color:var(--accent)}
   .close{position:absolute;top:12px;right:14px;border:none;background:transparent;font-size:1.6rem;
     color:var(--muted);cursor:pointer;line-height:1}
   .qr{margin-top:18px;font-size:.78rem;color:var(--muted);border:1px dashed var(--line);
@@ -115,17 +141,20 @@
   </div>
 </header>
 
-<div class="filters">
-  <div class="wrap">
-    <div class="facets">
-      <div class="facet" id="regionFacet"><span class="lbl">Region</span></div>
-      <div class="facet" id="genusFacet"><span class="lbl">Genus</span></div>
-    </div>
-  </div>
-</div>
 <div class="searchbar">
   <div class="wrap">
-    <div class="search"><input id="q" type="search" placeholder="Search name, region, genus…" aria-label="Search"></div>
+    <div class="searchbox" id="searchBox">
+      <input id="q" type="text" placeholder="Search or filter…" aria-label="Search" aria-expanded="false" aria-controls="filterPanel">
+      <button class="searchclose" id="searchClose" type="button" aria-label="Hide filters">×</button>
+      <div class="filterpanel" id="filterPanel">
+        <button class="panelclose" id="panelClose" type="button" aria-label="Hide filters">×</button>
+        <div class="facets">
+          <div class="facet" id="regionFacet"><span class="lbl">Region</span></div>
+          <div class="facet" id="genusFacet"><span class="lbl">Genus</span></div>
+          <div class="facet" id="otherFacet"><span class="lbl">Other</span></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -147,7 +176,7 @@
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
   const grid = document.getElementById('grid');
-  const state = { q:"", region:null, genus:null };
+  const state = { q:"", region:null, genus:null, tentative:false };
 
   const uniq = (arr)=>[...new Set(arr)];
   const asArr = (v)=>Array.isArray(v)?v:[v];      // tolerate old string-valued entries
@@ -167,27 +196,49 @@
   function buildFacet(el, values, key){
     values.forEach(v=>{
       const b=document.createElement('button');
-      b.className='chip' + (v===SPECIAL?' special':''); b.textContent=v; b.dataset.val=v;
-      b.onclick=()=>{ state[key] = state[key]===v ? null : v; syncChips(); render(); };
+      const color = key==='region' ? 'c-region' : (v===SPECIAL ? 'c-mixed' : 'c-genus');
+      b.className='chip '+color; b.textContent=v; b.dataset.val=v;
+      b.onclick=()=>selectFilter(key, v);
       el.appendChild(b);
     });
   }
-  // genera sorted, but the "Mixed" grouping pinned first and styled apart
   const genera = allGenera.filter(g=>g!==SPECIAL).sort();
   buildFacet(document.getElementById('regionFacet'), allRegions, 'region');
-  buildFacet(document.getElementById('genusFacet'), allGenera.includes(SPECIAL)?[...genera, SPECIAL]:genera, 'genus');
+  buildFacet(document.getElementById('genusFacet'), genera, 'genus');
+  buildOther(document.getElementById('otherFacet'));
+
+  // the "Other" group: the Mixed grouping (blue) + a Tentative filter (yellow)
+  function buildOther(el){
+    if(allGenera.includes(SPECIAL)){
+      const b=document.createElement('button');
+      b.className='chip c-mixed'; b.textContent=SPECIAL; b.dataset.other='mixed';
+      b.onclick=()=>selectFilter('genus', SPECIAL);
+      el.appendChild(b);
+    }
+    const t=document.createElement('button');
+    t.className='chip c-tentative'; t.textContent='Tentative'; t.dataset.other='tentative';
+    t.onclick=()=>selectFilter('tentative');
+    el.appendChild(t);
+  }
 
   function syncChips(){
     document.querySelectorAll('#regionFacet .chip').forEach(c=>c.classList.toggle('on',c.dataset.val===state.region));
     document.querySelectorAll('#genusFacet .chip').forEach(c=>c.classList.toggle('on',c.dataset.val===state.genus));
+    const mix=document.querySelector('#otherFacet .chip[data-other="mixed"]'); if(mix) mix.classList.toggle('on', state.genus===SPECIAL);
+    const ten=document.querySelector('#otherFacet .chip[data-other="tentative"]'); if(ten) ten.classList.toggle('on', !!state.tentative);
   }
 
-  document.getElementById('q').addEventListener('input', e=>{ state.q=e.target.value.toLowerCase().trim(); render(); });
+  document.getElementById('q').addEventListener('input', e=>{
+    state.q=e.target.value.toLowerCase().trim();
+    document.getElementById('searchBox').classList.toggle('hastext', e.target.value.length>0);
+    render();
+  });
 
   // ---- render grid
   function match(d){
     if(state.region && !asArr(d.region).includes(state.region)) return false;
     if(state.genus  && !asArr(d.genus).includes(state.genus))   return false;
+    if(state.tentative && !d.uncertain) return false;
     if(state.q){
       const hay=(d.name+' '+d.tag+' '+asArr(d.genus).join(' ')+' '+asArr(d.region).join(' ')+' '+d.origin+' '+d.blurb).toLowerCase();
       if(!hay.includes(state.q)) return false;
@@ -212,7 +263,7 @@
     grid.innerHTML=list.map(card).join('') || '<p class="count">No plants match those filters.</p>';
     document.getElementById('count').textContent =
       `${list.length} of ${data.length} plants` +
-      (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'');
+      (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'') + (state.tentative?' · Tentative':'');
   }
 
   // ---- modal
@@ -245,16 +296,30 @@
     const blue   = genera.filter(g=>g===SPECIAL).map(g=>`<span class="badge m click" data-genus="${escAttr(g)}">${g}</span>`);
     const grey   = asArr(d.region).map(r=>`<span class="badge r click" data-region="${escAttr(r)}">${r}</span>`);
     const green  = genera.filter(g=>g!==SPECIAL).map(g=>`<span class="badge click" data-genus="${escAttr(g)}">${g}</span>`);
-    const yellow = d.uncertain ? ['<span class="badge q">tentative</span>'] : [];
+    const yellow = d.uncertain ? ['<span class="badge q click" data-tentative="1">Tentative</span>'] : [];
     return [...blue, ...grey, ...green, ...yellow].join(' ');
   }
-  function filterGenus(g){
-    state.genus = g; syncChips(); render(); closeModal();
+  // only one filter may be active at a time
+  function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
+  // menu chips: toggle this filter (clearing the others)
+  function selectFilter(key, value){
+    const target = key==='tentative' ? true : value;
+    const wasActive = state[key] === target;
+    clearFilters();
+    if(!wasActive) state[key] = target;
+    syncChips(); render();
+  }
+  // modal tags: make this the only active filter, then close
+  function applyFilter(key, value){
+    clearFilters();
+    state[key] = key==='tentative' ? true : value;
+    syncChips(); render(); closeModal();
     window.scrollTo({top:0, behavior:'smooth'});
   }
-  function filterRegion(r){
-    state.region = r; syncChips(); render(); closeModal();
-    window.scrollTo({top:0, behavior:'smooth'});
+  // turn "#plant-id" cross-references in a blurb into links that open that plant
+  function linkifyBlurb(text){
+    return text.replace(/#([a-z0-9-]+)/gi, (m, id)=>
+      data.some(x=>x.id===id) ? `<a href="#${id}" class="xref" data-goto="${escAttr(id)}">#${id}</a>` : m);
   }
   function openModal(id){
     const d=data.find(x=>x.id===id); if(!d) return;
@@ -265,23 +330,42 @@
         <button class="close" onclick="closeModal()" aria-label="Close">×</button>
         <h2${isMixed(d)?' class="plain"':''}>${d.name}</h2>
         <div class="tags">${allTags(d)}</div>
-        <p>${d.blurb}</p>
+        <p>${linkifyBlurb(d.blurb)}</p>
         <div class="kv">
           <div><span class="k">Species</span><span>${speciesCell(d)}</span></div>
           <div><span class="k">Genus</span><span>${genusLinks(d)}</span></div>
           <div><span class="k">Origin</span><span>${d.origin}</span></div>
           <div><span class="k">Tag</span><span>#${d.id}</span></div>
-          <div><span class="k">Photo</span><span>${d.file.replace(/^photos\//,'')}</span></div>
         </div>
       </div>`;
-    sheet.querySelectorAll('[data-genus]').forEach(el=>{ el.onclick=()=>filterGenus(el.dataset.genus); });
-    sheet.querySelectorAll('[data-region]').forEach(el=>{ el.onclick=()=>filterRegion(el.dataset.region); });
+    sheet.querySelectorAll('[data-genus]').forEach(el=>{ el.onclick=()=>applyFilter('genus', el.dataset.genus); });
+    sheet.querySelectorAll('[data-region]').forEach(el=>{ el.onclick=()=>applyFilter('region', el.dataset.region); });
+    sheet.querySelectorAll('[data-tentative]').forEach(el=>{ el.onclick=()=>applyFilter('tentative'); });
+    sheet.querySelectorAll('[data-goto]').forEach(el=>{ el.onclick=e=>{ e.preventDefault(); openModal(el.dataset.goto); }; });
     modal.classList.add('open');
   }
   function closeModal(){ modal.classList.remove('open'); if(location.hash) history.replaceState(null,'',location.pathname); }
   modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
   window.openModal=openModal; window.closeModal=closeModal;
+
+  // the filter dropdown expands from the search field (floats over content)
+  const searchBox=document.getElementById('searchBox');
+  const searchInput=document.getElementById('q');
+  const filterPanel=document.getElementById('filterPanel');
+  function openPanel(){ searchBox.classList.add('open'); filterPanel.classList.add('open'); searchInput.setAttribute('aria-expanded','true'); }
+  function closePanel(){ searchBox.classList.remove('open'); filterPanel.classList.remove('open'); searchInput.setAttribute('aria-expanded','false'); }
+  searchInput.addEventListener('focus', openPanel);
+  searchInput.addEventListener('click', openPanel);
+  // field × just clears the search text (keeps the dropdown as-is)
+  document.getElementById('searchClose').addEventListener('click', ()=>{
+    searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
+    render(); searchInput.focus();
+  });
+  // dropdown corner × closes the panel
+  document.getElementById('panelClose').addEventListener('click', ()=>{ closePanel(); searchInput.blur(); });
+  document.addEventListener('click', e=>{ if(!searchBox.contains(e.target)) closePanel(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closePanel(); searchInput.blur(); } });
 
   render();
   // deep-link support (QR / shared link)

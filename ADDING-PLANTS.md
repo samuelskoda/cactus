@@ -4,7 +4,9 @@ Everything lives in [`data.js`](data.js) — no build step. Edit it, reload the 
 then commit & push to publish.
 
 ## Quick checklist
-1. **Add the photo** to the `photos/` folder (any name, e.g. `photos/IMG_9600.jpeg`).
+1. **Add the photo** to a folder named after the plant's `id` (its tag), e.g.
+   `photos/mammillaria-elongata/IMG_9600.jpeg`. One folder per plant — it can hold several
+   photos (only the one named in `file` is shown for now).
 2. **Copy the template below** into the `window.CACTI = [ … ]` array in `data.js` (anywhere;
    the site sorts alphabetically on its own).
 3. **Fill in the fields** (see reference below). Give it a **unique `id`**.
@@ -18,7 +20,7 @@ then commit & push to publish.
 
 ## Template
 ```js
-{ id: "genus-species", file: "photos/IMG_XXXX.jpeg", name: "Genus species",
+{ id: "genus-species", file: "photos/genus-species/IMG_XXXX.jpeg", name: "Genus species",
   tag: "Genus species", genus: ["Genus"], region: ["Mexico & SW USA"],
   origin: "Central Mexico",
   blurb: "One or two sentences: what it looks like, flowers, and basic care." },
@@ -30,7 +32,7 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 | Field | What to put |
 |---|---|
 | `id` | **Unique, stable** slug — this is the plant's `#tag` (QR target). Use `genus-species`; add `-1`, `-2` for duplicates of the same species. **Never reuse or rename an existing id** once QR codes are printed. |
-| `file` | Path to the photo, always `photos/IMG_XXXX.jpeg`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. |
+| `file` | Path to the photo inside the plant's own folder: `photos/<id>/IMG_XXXX.jpeg`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. |
 | `name` | The species (shown as the title, italicised). Its Wikipedia link is auto-built from the first two words. |
 | `tag` | The handwritten pot label text. Used for search; not shown on screen (the visible **Tag** row shows the `#id`). |
 | `genus` | **Array.** Normally one, e.g. `["Mammillaria"]`. Drives the green genus filter tag. |
