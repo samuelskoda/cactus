@@ -34,6 +34,12 @@
     height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
   #scroller{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
     scroll-behavior:smooth;overflow-anchor:none;position:relative}
+  /* Custom pull-to-refresh — the inner scroller has no native one. This sits just above
+     the content; the top overscroll bounce reveals it, and JS turns a far-enough pull into
+     a reload. */
+  #ptr{position:absolute;top:-46px;left:0;right:0;height:46px;display:flex;align-items:center;
+    justify-content:center;gap:6px;color:var(--muted);font-size:.85rem}
+  #ptr.ready{color:var(--accent);font-weight:600}
   a{color:var(--accent)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
@@ -203,6 +209,7 @@
 </head>
 <body>
 <div id="scroller">
+<div id="ptr" aria-hidden="true"><span id="ptrText">Pull to refresh</span></div>
 <header class="hero">
   <div class="wrap">
     <h1>🌵 My Cactus Collection</h1>
@@ -619,46 +626,51 @@
   });
   render();
 
-  // ---- TEMPORARY diagnostic (?debug=1) — remove once the keyboard misplacement is solved.
-  // Built to NOT mask the bug: the previous overlay repainted a full-frame fixed box every
-  // frame, which forced iOS to keep the layer synced and made the bug vanish. This one only
-  // touches the DOM when it records a NEW WORST position (rare), so it can't paper over the
-  // drift. The rAF loop just READS the bar's rect silently — that alone doesn't mask it.
-  // Reproduce the bug, then read the WORST line + captures at the bottom (tap to select).
-  if(/(\?|&)debug=1/.test(location.search)){
-    const bar=document.querySelector('.searchbar');
-    const vv=window.visualViewport;
-    const box=document.createElement('div');
-    box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;max-height:40vh;'+
-      'overflow:auto;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;'+
-      'padding:6px;white-space:pre-wrap;-webkit-user-select:text;user-select:text';
-    box.textContent='debug on — reproduce the bug (activate search, scroll), then read here.';
-    box.onclick=()=>{ const r=document.createRange(); r.selectNodeContents(box);
-      const s=getSelection(); s.removeAllRanges(); s.addRange(r); };
-    document.body.appendChild(box);
-    const hits=[]; let worst=0;
-    const paint=()=>{ box.textContent =
-      'WORST barTop '+Math.round(worst)+'px  (negative = bar above screen). Tap to select.\n'+
-      hits.map(h=>JSON.stringify(h)).join('\n'); };
-    (function watch(){
-      const top=bar.getBoundingClientRect().top;   // silent read — proven not to mask
-      if(top < worst-0.5){                          // NEW worst only → rare repaint
-        worst=top;
-        hits.unshift({
-          barTop:Math.round(top),                     // want ~0 (bar anchored at scroller top)
-          pos: getComputedStyle(bar).position,
-          offsetTop: vv?Math.round(vv.offsetTop):'n/a',  // keyboard viewport pan (0 = no pan)
-          vvHeight: vv?Math.round(vv.height):'n/a',
-          scrollTop:Math.round(document.getElementById('scroller').scrollTop),
-          innerH:window.innerHeight,
-          focused: document.activeElement===document.getElementById('q')?'Y':'-',
-        });
-        hits.length=Math.min(hits.length,10);
-        paint();
-      }
-      requestAnimationFrame(watch);
-    })();
+  // ---- Keyboard bottom gap: when the keyboard is up it covers the lower part of the
+  // scroller, so the last cards can't be scrolled clear of it. Pad the bottom by the
+  // keyboard's height so they can. Cleared when the keyboard closes.
+  if(window.visualViewport){
+    const vvp = window.visualViewport;
+    const updateKbGap = ()=>{
+      const kb = Math.max(0, window.innerHeight - vvp.height - vvp.offsetTop);
+      scroller.style.paddingBottom = kb > 120 ? kb + 'px' : '';
+    };
+    vvp.addEventListener('resize', updateKbGap);
+    vvp.addEventListener('scroll', updateKbGap);
   }
+
+  // ---- Custom pull-to-refresh (the inner scroller has no native one). A downward drag
+  // that starts at the very top and passes a threshold reloads the page.
+  const ptr = document.getElementById('ptr'), ptrText = document.getElementById('ptrText');
+  const PTR_TRIGGER = 90;
+  let ptrStartY = null;
+  scroller.addEventListener('touchstart', e=>{
+    ptrStartY = scroller.scrollTop <= 0 ? e.touches[0].clientY : null;
+  }, {passive:true});
+  scroller.addEventListener('touchmove', e=>{
+    if(ptrStartY == null) return;
+    const dy = e.touches[0].clientY - ptrStartY;
+    if(dy > 0 && scroller.scrollTop <= 0){
+      const ready = dy > PTR_TRIGGER;
+      ptr.classList.toggle('ready', ready);
+      ptrText.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
+    }
+  }, {passive:true});
+  scroller.addEventListener('touchend', e=>{
+    if(ptrStartY != null && scroller.scrollTop <= 0
+       && (e.changedTouches[0].clientY - ptrStartY) > PTR_TRIGGER){
+      ptrText.textContent = 'Refreshing…';
+      location.reload();
+    }
+    ptrStartY = null; ptr.classList.remove('ready');
+  }, {passive:true});
+
+  // ---- Scroll to top on a status-bar tap. iOS routes that gesture to the root scroller,
+  // which no longer scrolls (content is in #scroller), so mirror any root scroll-to-0 onto
+  // the scroller. Harmless elsewhere.
+  window.addEventListener('scroll', ()=>{
+    if(window.scrollY === 0 && scroller.scrollTop > 0) scroller.scrollTo({top:0, behavior:'smooth'});
+  }, {passive:true});
 
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
