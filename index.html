@@ -589,13 +589,17 @@
     }
     searchbarEl.style.top = t+'px';
   };
+  let scrollAfterSettle=false;   // see the searchClose handler
   if(vv){
     const keyboardOpen = ()=> (window.innerHeight - vv.height) > 120;
     let settleTimer=null;
     const onSettled = ()=>{
+      settleTimer=null;
       // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
       if(keyboardOpen()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
       else goSticky();
+      // a scroll-to-results requested mid-transition runs now, against the FINAL layout
+      if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     };
     const onChange = ()=>{
       // viewport is moving (keyboard sliding, or a pan): ride the content as a sticky
@@ -606,6 +610,11 @@
     };
     vv.addEventListener('resize', onChange);
     vv.addEventListener('scroll', onChange);
+    // Ordinary page scrolling fires neither vv event, so without this the settle timer
+    // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
+    // it — a pin/unpin flicker exactly as scrolling slows. Any page scroll while the bar
+    // is pinned or a settle is pending counts as motion and pushes the pin back.
+    window.addEventListener('scroll', ()=>{ if(pinned || settleTimer) onChange(); }, {passive:true});
   }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
@@ -632,7 +641,12 @@
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
-    scrollToResults();
+    // If the bar is pinned, the blur is about to close the keyboard: the viewport height,
+    // the spacer, and the bar's position are all about to change. A scroll computed NOW
+    // targets a layout that's about to shift and lands offset (ended up lines above the
+    // bar). Defer it to onSettled so it runs against the final layout instead.
+    if(pinned) scrollAfterSettle=true;
+    else scrollToResults();
   });
 
   // loading="lazy" keeps the first paint cheap, but it also means a card sitting far
