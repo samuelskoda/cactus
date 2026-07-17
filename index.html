@@ -556,37 +556,11 @@
     }
   }, {passive:true});
 
-  // Stick to the VISUAL viewport, not the layout one.
-  // position:sticky;top:0 anchors to the layout viewport. When the keyboard opens, iOS
-  // doesn't scroll the document to reveal the input — it pans the visual viewport inside
-  // the layout viewport, so visualViewport.offsetTop goes positive and the layout
-  // viewport's top ends up above the screen. The bar then sticks to a point offsetTop px
-  // too high: half above the display, or all of it (which reads as the bar "disappearing").
-  // Not a paint bug — a misplacement. It needs the keyboard because offsetTop is otherwise 0.
-  //
-  // Event-based syncing on visualViewport 'resize'/'scroll' was NOT enough: those events
-  // land a frame behind the compositor, so the bar still drifted for the frames in between.
-  // Scoping a rAF loop to "while the viewport is panning" also failed — the bar drifts
-  // during slow scrolling (toolbar collapsing) when the loop had already stopped.
-  //
-  // The one configuration proven to work on-device is the debug overlay's: a rAF loop that
-  // ran EVERY frame from load, unconditionally, merely reading the bar's rect — a per-frame
-  // layout read forces the sticky position to re-sync with the compositor each frame. There
-  // is also an observer effect: the loop is itself the fix, so the bug can't be reproduced
-  // while it runs. So don't try to be clever about when to run it — run it always, and just
-  // add the top:=offsetTop correction on top of the forced read.
-  // Cost: one getBoundingClientRect (and a rare style write) per frame while the page is
-  // visible. Cheap, and browsers pause rAF in background tabs.
-  const vv = window.visualViewport;
-  if(vv){
-    const searchbarEl = document.querySelector('.searchbar');
-    (function keepBarPinned(){
-      const t = Math.max(0, Math.round(vv.offsetTop));
-      if(searchbarEl.style.top !== t+'px') searchbarEl.style.top = t+'px';
-      void searchbarEl.getBoundingClientRect().top;   // forces the per-frame compositor re-sync
-      requestAnimationFrame(keepBarPinned);
-    })();
-  }
+  // The bar is plain position:sticky;top:0. No JS touches its position — an earlier rAF
+  // loop synced top to visualViewport.offsetTop to fight the keyboard misplacement, but it
+  // never fixed that and it caused a new bug: during the bottom rubber-band bounce iOS
+  // shifts the visual viewport, offsetTop goes non-zero, and the loop pushed the bar down
+  // off the top edge. Removed.
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
