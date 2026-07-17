@@ -37,8 +37,10 @@
   .stat span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
   /* Sticky bar: a search field + a separate Filters button */
-  .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
+  /* solid background, no backdrop-filter: iOS Safari flickers backdrop blurs on
+     sticky elements while scrolling (the compositor drops/re-applies the layer) */
+  .searchbar{position:sticky;top:0;z-index:20;background:var(--bg);
+    border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
   .searchrow{position:relative;display:flex;gap:8px;align-items:center;justify-content:center}
   .search{position:relative;flex:0 1 260px;min-width:0}
   /* font-size:16px keeps iOS from auto-zooming when the field is tapped; explicit
