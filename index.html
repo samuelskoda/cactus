@@ -38,8 +38,18 @@
      the content; the top overscroll bounce reveals it, and JS turns a far-enough pull into
      a reload. */
   #ptr{position:absolute;top:-46px;left:0;right:0;height:46px;display:flex;align-items:center;
-    justify-content:center;gap:6px;color:var(--muted);font-size:.85rem}
+    justify-content:center;gap:8px;color:var(--muted);font-size:.85rem}
   #ptr.ready{color:var(--accent);font-weight:600}
+  #ptrSpin{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);
+    border-top-color:var(--accent);flex:0 0 auto}
+  #ptr.spin #ptrSpin{animation:ptrspin .7s linear infinite}
+  @keyframes ptrspin{to{transform:rotate(360deg)}}
+  /* scroll-to-top button (substitute for the iOS status-bar tap; see markup) */
+  #toTop{position:fixed;right:16px;bottom:16px;width:46px;height:46px;border-radius:50%;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:1.4rem;
+    line-height:1;box-shadow:var(--shadow);cursor:pointer;z-index:40;
+    opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;pointer-events:none}
+  #toTop.show{opacity:1;transform:none;pointer-events:auto}
   a{color:var(--accent)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
@@ -209,7 +219,7 @@
 </head>
 <body>
 <div id="scroller">
-<div id="ptr" aria-hidden="true"><span id="ptrText">Pull to refresh</span></div>
+<div id="ptr" aria-hidden="true"><span id="ptrSpin"></span><span id="ptrText">Pull to refresh</span></div>
 <header class="hero">
   <div class="wrap">
     <h1>🌵 My Cactus Collection</h1>
@@ -261,6 +271,11 @@
 <div class="modal" id="modal" role="dialog" aria-modal="true">
   <div class="sheet" id="sheet"></div>
 </div>
+
+<!-- scroll-to-top: iOS routes its status-bar tap to the root scroller, which we no longer
+     use, so that gesture can't reach #scroller and can't be hooked from JS. This button is
+     the reliable substitute — appears once you've scrolled down. -->
+<button id="toTop" type="button" aria-label="Scroll to top">↑</button>
 
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
@@ -642,6 +657,7 @@
   // ---- Custom pull-to-refresh (the inner scroller has no native one). A downward drag
   // that starts at the very top and passes a threshold reloads the page.
   const ptr = document.getElementById('ptr'), ptrText = document.getElementById('ptrText');
+  const ptrSpin = document.getElementById('ptrSpin');
   const PTR_TRIGGER = 90;
   let ptrStartY = null;
   scroller.addEventListener('touchstart', e=>{
@@ -654,23 +670,29 @@
       const ready = dy > PTR_TRIGGER;
       ptr.classList.toggle('ready', ready);
       ptrText.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
+      ptrSpin.style.transform = 'rotate(' + Math.min(dy, 140) * 2.5 + 'deg)';  // wind up with the pull
     }
   }, {passive:true});
   scroller.addEventListener('touchend', e=>{
     if(ptrStartY != null && scroller.scrollTop <= 0
        && (e.changedTouches[0].clientY - ptrStartY) > PTR_TRIGGER){
       ptrText.textContent = 'Refreshing…';
+      ptrSpin.style.transform = '';
+      ptr.classList.add('spin');           // hand off to the continuous spin animation
       location.reload();
+      return;
     }
-    ptrStartY = null; ptr.classList.remove('ready');
+    ptrStartY = null; ptr.classList.remove('ready'); ptrSpin.style.transform = '';
   }, {passive:true});
 
-  // ---- Scroll to top on a status-bar tap. iOS routes that gesture to the root scroller,
-  // which no longer scrolls (content is in #scroller), so mirror any root scroll-to-0 onto
-  // the scroller. Harmless elsewhere.
-  window.addEventListener('scroll', ()=>{
-    if(window.scrollY === 0 && scroller.scrollTop > 0) scroller.scrollTo({top:0, behavior:'smooth'});
+  // ---- Scroll-to-top button: shows once scrolled down, taps back to the top. (The iOS
+  // status-bar tap can't reach an inner scroll container and has no JS event, so this
+  // stands in for it.)
+  const toTop = document.getElementById('toTop');
+  scroller.addEventListener('scroll', ()=>{
+    toTop.classList.toggle('show', scroller.scrollTop > 700);
   }, {passive:true});
+  toTop.addEventListener('click', ()=> scroller.scrollTo({top:0, behavior:'smooth'}));
 
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
