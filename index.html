@@ -39,11 +39,13 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* Frosted glass, on a dedicated child layer rather than the bar itself: iOS's
-     keyboard resize leaves the blur's backdrop snapshot stale, and no amount of
-     style-toggling on a live element reliably rebuilds it. A childless, listener-
-     free div CAN simply be swapped for a fresh clone (see JS) — a new node can't
-     have a stale snapshot. -webkit- prefix required below Safari 18. */
+  /* Frosted glass on a dedicated child layer rather than on the bar itself. The bar is
+     sticky, and a blur on a sticky element went stale after the keyboard resized the
+     visual viewport, flickering on every later scroll; this div isn't sticky, which
+     appears to be what fixed it. It sits at z-index:-1 so it paints behind the bar's
+     content, and the bar must therefore stay background-less for the blur to sample the
+     page rather than the bar. That also means this div IS the visible bar — never remove
+     it, even briefly, or the whole bar blinks out. -webkit- prefix required below 18. */
   .searchbar .glass{position:absolute;inset:0;z-index:-1;
     background:color-mix(in srgb,var(--bg) 88%, transparent);
     -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -550,37 +552,12 @@
     }
   }, {passive:true});
 
-  // The keyboard's viewport resize leaves the glass layer's backdrop snapshot stale, and
-  // iOS then re-reads it every frame while scrolling — the flicker. Style toggles and
-  // synthetic events on the live element never rebuilt it (the repair happens in the
-  // compositor, which JS events can't reach). So destroy the element instead: swap the
-  // glass div for a fresh clone. A brand-new node can't have a stale snapshot — iOS must
-  // build its backdrop layer from scratch. The div is childless and has no listeners, so
-  // the swap loses nothing. Deferred until scrolling settles (any scroll re-arms the
-  // timer): a swap mid-scroll could itself land stale, which sank an earlier attempt.
-  function refreshGlass(){
-    const old=document.querySelector('.searchbar .glass');
-    if(old) old.replaceWith(old.cloneNode(false));
-  }
-  // The glass is deliberately NOT suspended during the keyboard transition: it was, and
-  // the bar still flickered through that window with the blur entirely display:none —
-  // which proves the flicker there isn't the backdrop at all. Suspending only cost the
-  // effect. So leave the glass up throughout and just swap the node once things settle.
-  let glassTimer=null, glassPending=false;
-  function scheduleGlassRefresh(){
-    glassPending=true;
-    clearTimeout(glassTimer);
-    glassTimer=setTimeout(()=>{ glassPending=false; refreshGlass(); }, 250);
-  }
-  // Trigger on the search input's focus/blur, NOT on visualViewport resize: on iOS the
-  // visual viewport also resizes whenever Safari's toolbar collapses or expands during
-  // ordinary scrolling, so hooking the resize event suspended the glass on every plain
-  // scroll — flashing opaque/glass constantly. Focus and blur are the only moments the
-  // keyboard can actually open or close (the search field is the page's only input).
-  searchInput.addEventListener('focus', scheduleGlassRefresh);
-  searchInput.addEventListener('blur', scheduleGlassRefresh);
-  // only postpones a refresh that's already due — normal scrolling never triggers one
-  window.addEventListener('scroll', ()=>{ if(glassPending) scheduleGlassRefresh(); }, {passive:true});
+  // No JS touches the glass. There was machinery here that swapped the .glass div for a
+  // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
+  // bar carries no background of its own — it must stay transparent for the blur to sample
+  // the page — so the .glass div paints the entire visible bar, and a new backdrop-filter
+  // element paints nothing until the compositor builds its layer. Removing the div, even
+  // for a frame, therefore removes the bar. The glass is now pure CSS and permanent.
 
   // Tapping the field scrolls the bar to the top, same as typing does. Besides being
   // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
