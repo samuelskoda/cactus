@@ -672,9 +672,9 @@
         worst=top;
         hits.unshift({
           barTop:Math.round(top),
-          styleTop:bar.style.top||'-',
+          pos: getComputedStyle(bar).position,        // sticky = pin didn't engage; fixed = fixed also broke
+          pinned: bar.classList.contains('pinned')?'Y':'-',
           offsetTop: vv?Math.round(vv.offsetTop):'n/a',
-          pageTop: vv?Math.round(vv.pageTop):'n/a',
           vvHeight: vv?Math.round(vv.height):'n/a',
           scrollY:Math.round(window.scrollY),
           innerH:window.innerHeight,
