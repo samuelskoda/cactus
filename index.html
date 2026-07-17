@@ -39,16 +39,20 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* Frosted glass on a dedicated child layer rather than on the bar itself. The bar is
-     sticky, and a blur on a sticky element went stale after the keyboard resized the
-     visual viewport, flickering on every later scroll; this div isn't sticky, which
-     appears to be what fixed it. It sits at z-index:-1 so it paints behind the bar's
-     content, and the bar must therefore stay background-less for the blur to sample the
-     page rather than the bar. That also means this div IS the visible bar — never remove
-     it, even briefly, or the whole bar blinks out. -webkit- prefix required below 18. */
-  .searchbar .glass{position:absolute;inset:0;z-index:-1;
+  /* Frosted glass on a dedicated child layer rather than on the bar itself: a blur on the
+     sticky bar went stale after the keyboard resized the visual viewport and flickered on
+     every later scroll; this div isn't sticky, which is what fixed that.
+     The layers are ordered explicitly — glass at 0, content above at 1 — and NOT with a
+     negative z-index on the glass. Under z-index:-1 iOS intermittently painted the glass
+     over the bar's content instead of behind it during keyboard/toolbar re-composites:
+     its near-opaque tint flattened the bar into a dark rectangle (looked like the bar
+     vanishing) and visibly darkened the opaque input and Filter button, clearing once the
+     compositor settled. The bar must stay background-less either way, so the blur samples
+     the page rather than the bar. -webkit- prefix required below Safari 18. */
+  .searchbar .glass{position:absolute;inset:0;z-index:0;
     background:color-mix(in srgb,var(--bg) 88%, transparent);
     -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  .searchbar > .wrap{position:relative;z-index:1}
   /* No blur support -> opaque bar, so content can't show through while it's stuck. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
     .searchbar{background:var(--bg)}
