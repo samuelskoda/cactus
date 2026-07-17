@@ -47,6 +47,9 @@
   .searchbar .glass{position:absolute;inset:0;z-index:-1;
     background:color-mix(in srgb,var(--bg) 88%, transparent);
     -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  /* Glass suspended (keyboard transition in flight — see JS): opaque bar instead. */
+  .searchbar.noglass{background:var(--bg)}
+  .searchbar.noglass .glass{display:none}
   /* No blur support -> opaque bar, so content can't show through while it's stuck. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
     .searchbar{background:var(--bg)}
@@ -530,11 +533,22 @@
     const old=document.querySelector('.searchbar .glass');
     if(old) old.replaceWith(old.cloneNode(false));
   }
+  // The swap can only land once scrolling settles, which left a window — keyboard
+  // dismissal until the scroll stops — of scrolling under the stale snapshot: the
+  // residual flicker. Flicker needs the blur ON, and turning it OFF doesn't need a
+  // still page. So suspend the glass instantly (opaque bar) for the whole transition,
+  // and restore a fresh node after settle; the stale snapshot never paints a frame.
+  const searchbarEl = document.querySelector('.searchbar');
   let glassTimer=null, glassPending=false;
   function scheduleGlassRefresh(){
     glassPending=true;
+    searchbarEl.classList.add('noglass');
     clearTimeout(glassTimer);
-    glassTimer=setTimeout(()=>{ glassPending=false; refreshGlass(); }, 250);
+    glassTimer=setTimeout(()=>{
+      glassPending=false;
+      refreshGlass();
+      searchbarEl.classList.remove('noglass');
+    }, 250);
   }
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', scheduleGlassRefresh);  // keyboard open/close
