@@ -564,31 +564,28 @@
   // too high: half above the display, or all of it (which reads as the bar "disappearing").
   // Not a paint bug — a misplacement. It needs the keyboard because offsetTop is otherwise 0.
   //
-  // Doing this on visualViewport 'resize'/'scroll' events was NOT enough: those events land
-  // a frame behind the compositor, so the bar still drifted for the frames in between (worst
-  // as a slow scroll settles). The tell was the debug overlay — it merely READ the bar's
-  // rect every frame in a rAF loop and never moved it, yet the bug vanished, because a
-  // per-frame layout read forces the sticky position to re-sync with the compositor.
-  // So sync every frame while the viewport is actually panning, and stop once it settles
-  // (offsetTop back at 0 for a few frames and the field isn't focused) so nothing runs
-  // per-frame during ordinary scrolling.
+  // Event-based syncing on visualViewport 'resize'/'scroll' was NOT enough: those events
+  // land a frame behind the compositor, so the bar still drifted for the frames in between.
+  // Scoping a rAF loop to "while the viewport is panning" also failed — the bar drifts
+  // during slow scrolling (toolbar collapsing) when the loop had already stopped.
+  //
+  // The one configuration proven to work on-device is the debug overlay's: a rAF loop that
+  // ran EVERY frame from load, unconditionally, merely reading the bar's rect — a per-frame
+  // layout read forces the sticky position to re-sync with the compositor each frame. There
+  // is also an observer effect: the loop is itself the fix, so the bug can't be reproduced
+  // while it runs. So don't try to be clever about when to run it — run it always, and just
+  // add the top:=offsetTop correction on top of the forced read.
+  // Cost: one getBoundingClientRect (and a rare style write) per frame while the page is
+  // visible. Cheap, and browsers pause rAF in background tabs.
   const vv = window.visualViewport;
   if(vv){
     const searchbarEl = document.querySelector('.searchbar');
-    let rafId=0, settledFrames=0;
-    const syncFrame = ()=>{
+    (function keepBarPinned(){
       const t = Math.max(0, Math.round(vv.offsetTop));
       if(searchbarEl.style.top !== t+'px') searchbarEl.style.top = t+'px';
-      void searchbarEl.getBoundingClientRect().top;   // force the compositor re-sync (the debug overlay's real effect)
-      // keep going while the viewport is panned, the field is focused, or it only just settled
-      if(t!==0 || document.activeElement===searchInput) settledFrames=0; else settledFrames++;
-      if(settledFrames>=10){ rafId=0; return; }
-      rafId=requestAnimationFrame(syncFrame);
-    };
-    const startSync = ()=>{ if(!rafId){ settledFrames=0; rafId=requestAnimationFrame(syncFrame); } };
-    vv.addEventListener('resize', startSync);   // keyboard open/close, pinch-zoom
-    vv.addEventListener('scroll', startSync);   // visual-viewport pan
-    searchInput.addEventListener('focus', startSync);
+      void searchbarEl.getBoundingClientRect().top;   // forces the per-frame compositor re-sync
+      requestAnimationFrame(keepBarPinned);
+    })();
   }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
