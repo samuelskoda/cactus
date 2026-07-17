@@ -39,6 +39,14 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
+  /* While the keyboard is open, iOS Safari breaks position:sticky — the bar stops sticking
+     and scrolls off with the page (measured: barTop -1322 at scrollY 1622, offsetTop 0,
+     visualViewport height 362 vs layout 739). position:fixed does NOT have this bug, and
+     because the viewport isn't panned (offsetTop 0) fixed;top:0 lands exactly at the screen
+     top. We only pin while the keyboard is engaged — by then focus has already scrolled the
+     bar to the top and the header is off-screen, so fixed;top:0 doesn't cover anything. The
+     #scrollAnchor above reserves the bar's flow height meanwhile so nothing jumps. */
+  .searchbar.pinned{position:fixed;top:0;left:0;right:0;margin-bottom:0}
   /* Frosted glass on a dedicated child layer rather than on the bar itself: a blur on the
      sticky bar went stale after the keyboard resized the visual viewport and flickered on
      every later scroll; this div isn't sticky, which is what fixed that.
@@ -556,11 +564,32 @@
     }
   }, {passive:true});
 
-  // The bar is plain position:sticky;top:0. No JS touches its position — an earlier rAF
-  // loop synced top to visualViewport.offsetTop to fight the keyboard misplacement, but it
-  // never fixed that and it caused a new bug: during the bottom rubber-band bounce iOS
-  // shifts the visual viewport, offsetTop goes non-zero, and the loop pushed the bar down
-  // off the top edge. Removed.
+  // Pin the bar (sticky -> fixed) only while the keyboard is open, where sticky breaks.
+  // Detected by the visual viewport being shorter than the layout viewport. On pin, the
+  // #scrollAnchor takes over the bar's flow height so the results don't jump up under it.
+  const searchbarEl = document.querySelector('.searchbar');
+  const scrollAnchorEl = document.getElementById('scrollAnchor');
+  const vv = window.visualViewport;
+  let pinned=false;
+  const pin = ()=>{
+    if(pinned) return;
+    pinned=true;
+    scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + its margin
+    searchbarEl.classList.add('pinned');
+  };
+  const unpin = ()=>{
+    if(!pinned) return;
+    pinned=false;
+    searchbarEl.classList.remove('pinned');
+    scrollAnchorEl.style.height = '0';
+  };
+  if(vv){
+    // Keyboard open when the visual viewport is meaningfully shorter than the layout one.
+    // This fires on keyboard show/hide (before you can scroll), and never on desktop — where
+    // focus opens no keyboard, so the bar stays sticky and never covers the header.
+    const keyboardOpen = ()=> (window.innerHeight - vv.height) > 120;
+    vv.addEventListener('resize', ()=>{ keyboardOpen() ? pin() : unpin(); });
+  }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
