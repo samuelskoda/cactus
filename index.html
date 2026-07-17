@@ -550,17 +550,17 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Mobile keyboard vs the sticky bar: while the keyboard is open, iOS pans the
-  // visual viewport and sticky (layout-viewport-anchored) drifts. Chasing it with
-  // JS transforms stutters — iOS scrolls on the compositor thread, so JS always
-  // lands a frame late. Instead: the moment a scroll gesture starts, dismiss the
-  // keyboard. Scrolling then only ever happens with the keyboard closed, where
-  // sticky is natively smooth. (touchmove = a real finger drag; programmatic
-  // scrolls like scrollToResults() don't fire it, so typing keeps the keyboard.)
+  // Dismiss the keyboard on touchSTART (finger lands), not touchmove (finger already
+  // dragging). sticky breaks on the root scroller while the keyboard is mid-close, so the
+  // close must overlap the scroll as little as possible: blurring at touchstart starts the
+  // close on a STILL page, before any scrolling — the same reason a deliberate tap outside
+  // never flickers. It also gives standard iOS behavior: touching anywhere outside the
+  // search row dismisses the keyboard. Touches inside the row (the field, ×, Filter) are
+  // excluded so using them doesn't close it.
   const searchRowEl = document.getElementById('searchRow');
-  document.addEventListener('touchmove', e=>{
+  document.addEventListener('touchstart', e=>{
     if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
-      searchInput.blur();   // the blur event also suspends the glass; see below
+      searchInput.blur();
     }
   }, {passive:true});
 
