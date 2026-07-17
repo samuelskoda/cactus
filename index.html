@@ -100,6 +100,8 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-bottom:60px;overflow-anchor:none}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column}
+  /* display:flex above would otherwise beat the hidden attribute */
+  .card[hidden]{display:none}
   .thumb{aspect-ratio:3/4;background:var(--sand);overflow:hidden}
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .card .body{padding:12px 13px 14px}
@@ -232,6 +234,7 @@
     uniq(data.map(d=>d.name.replace(/\s*\(.*\)/,'')).filter(n=>!/^Mixed|sp\.$|offshoots/i.test(n))).length;
   const SPECIAL = "Mixed & offshoots";              // grouping tag, not a real genus
   const isMixed = d => asArr(d.genus).includes(SPECIAL);
+  const escAttr = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const allGenera  = uniq(data.flatMap(d=>asArr(d.genus)));
   const allRegions = uniq(data.flatMap(d=>asArr(d.region)));
   document.getElementById('s-genera').textContent  = allGenera.filter(g=>g!==SPECIAL).length;
@@ -292,7 +295,7 @@
     return true;
   }
   function card(d){
-    return `<article class="card" onclick="openModal('${d.id}')">
+    return `<article class="card" data-id="${escAttr(d.id)}" onclick="openModal('${d.id}')">
       <div class="thumb"><img loading="lazy" src="${d.file}" alt="${d.name}"></div>
       <div class="body">
         <p class="sci${isMixed(d)?' plain':''}">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}</p>
@@ -300,6 +303,21 @@
       </div>
     </article>`;
   }
+
+  // Build every card ONCE. Filtering then only toggles visibility and reorders,
+  // never recreating the <img> elements — rebuilding the grid's innerHTML on each
+  // keystroke destroyed and re-created every image, so they blanked for a frame
+  // while re-decoding. That was the flashing (and why an empty search, which
+  // never re-renders, never flashed).
+  const sortedAll = [...data].sort((a,b)=>{
+    const am=isMixed(a), bm=isMixed(b);
+    if(am!==bm) return am?1:-1;               // Mixed & offshoots always last
+    return a.name.localeCompare(b.name);      // otherwise alphabetical by name
+  });
+  grid.innerHTML = sortedAll.map(card).join('') + '<p class="count empty-msg" hidden>No plants match those filters.</p>';
+  const cardEls = new Map(sortedAll.map(d=>[d.id, grid.querySelector(`.card[data-id="${CSS.escape(d.id)}"]`)]));
+  const emptyMsgEl = grid.querySelector('.empty-msg');
+
   function render(){
     // Pre-grow the spacer BEFORE the grid changes, using only measurements of
     // the OLD (still on-screen) grid. If we waited to measure until after a
@@ -308,14 +326,16 @@
     // animates. Growing first, conservatively, makes that shrink impossible.
     growPadForWorstCase();
 
-    const list=data.filter(match).sort((a,b)=>{
-      const am=isMixed(a), bm=isMixed(b);
-      if(am!==bm) return am?1:-1;               // Mixed & offshoots always last
-      return a.name.localeCompare(b.name);      // otherwise alphabetical by name
-    });
-    grid.innerHTML=list.map(card).join('') || '<p class="count">No plants match those filters.</p>';
+    let shown=0;
+    for(const d of sortedAll){
+      const el=cardEls.get(d.id);
+      const visible=match(d);
+      if(visible) shown++;
+      if(el.hidden === visible) el.hidden = !visible;   // only touch the DOM on change
+    }
+    emptyMsgEl.hidden = shown>0;
     document.getElementById('count').textContent =
-      `${list.length} of ${data.length} plants` +
+      `${shown} of ${data.length} plants` +
       (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'') + (state.tentative?' · Tentative':'');
     document.getElementById('filterToggle').classList.toggle('active', !!(state.region||state.genus||state.tentative));
 
@@ -378,7 +398,6 @@
       return url ? `<a href="${url}" target="_blank" rel="noopener"><em>${s}</em></a>` : s;
     }).join(' · ');
   }
-  const escAttr = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   // all filter tags on one line, ordered: blue Mixed, grey Region, green Genus, yellow tentative
   function allTags(d){
     const genera = asArr(d.genus);
