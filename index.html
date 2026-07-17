@@ -564,53 +564,48 @@
     }
   }, {passive:true});
 
-  // Pin the bar (sticky -> fixed) only while the keyboard is open, where sticky breaks.
-  // Detected by the visual viewport being shorter than the layout viewport. On pin, the
-  // #scrollAnchor takes over the bar's flow height so the results don't jump up under it.
-  //
-  // While pinned, also sync top := visualViewport.offsetTop every frame. When the keyboard
-  // opens iOS pans the visual viewport down (offsetTop goes positive), but a fixed element
-  // stays anchored to the layout viewport — so at top:0 the bar sits offsetTop px above what
-  // you can see (measured: barTop -300 == -offsetTop while typing). top:=offsetTop drops it
-  // back to the visible top. This runs ONLY while pinned, so the bottom rubber-band bounce
-  // (keyboard closed) never sees it — that's the regression that killed the always-on version.
+  // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
+  // rubber — the content slides on the compositor and JS always follows a frame late).
+  // Instead: while the visual viewport is MOVING, leave the bar sticky so it rides the
+  // content natively (no JS, no lag — "moves with content"). Only once the viewport has
+  // SETTLED do we pin it once to fixed;top:=offsetTop, the correct resting spot. No rAF,
+  // no continuous sync. Every transition is a single reposition, never a chase.
   const searchbarEl = document.querySelector('.searchbar');
   const scrollAnchorEl = document.getElementById('scrollAnchor');
   const vv = window.visualViewport;
-  let pinned=false, syncRaf=0;
-  const syncTop = ()=>{
-    if(!pinned){ syncRaf=0; return; }
-    const t = Math.max(0, Math.round(vv.offsetTop));
-    if(searchbarEl.style.top !== t+'px') searchbarEl.style.top = t+'px';
-    syncRaf = requestAnimationFrame(syncTop);
-  };
-  const pin = ()=>{
-    if(pinned) return;
-    pinned=true;
-    scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + its margin
-    searchbarEl.classList.add('pinned');
-    if(!syncRaf) syncRaf = requestAnimationFrame(syncTop);
-  };
-  const unpin = ()=>{
+  let pinned=false;
+  const goSticky = ()=>{
     if(!pinned) return;
     pinned=false;
     searchbarEl.classList.remove('pinned');
     searchbarEl.style.top = '';           // back to the CSS sticky top:0
     scrollAnchorEl.style.height = '0';
   };
+  const pinFixed = (t)=>{
+    if(!pinned){
+      pinned=true;
+      scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
+      searchbarEl.classList.add('pinned');
+    }
+    searchbarEl.style.top = t+'px';
+  };
   if(vv){
-    // Keyboard open when the visual viewport is meaningfully shorter than the layout one.
-    // Fires on keyboard show/hide (before you can scroll), never on desktop (no keyboard).
     const keyboardOpen = ()=> (window.innerHeight - vv.height) > 120;
-    const updatePinState = ()=>{
-      if(keyboardOpen()) pin();
-      // Unpin only once the pan has ALSO settled to 0. The height recovers a beat before
-      // offsetTop does; unpinning on height alone hands off fixed(top:offsetTop) -> sticky
-      // (top:0) while offsetTop is still non-zero, jerking the bar up above its rest spot.
-      else if(Math.round(vv.offsetTop)===0) unpin();
+    let settleTimer=null;
+    const onSettled = ()=>{
+      // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
+      if(keyboardOpen()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      else goSticky();
     };
-    vv.addEventListener('resize', updatePinState);
-    vv.addEventListener('scroll', updatePinState);   // syncTop self-sustains via rAF while pinned
+    const onChange = ()=>{
+      // viewport is moving (keyboard sliding, or a pan): ride the content as a sticky
+      // element — native, no lag — and re-decide once it stops.
+      goSticky();
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(onSettled, 120);
+    };
+    vv.addEventListener('resize', onChange);
+    vv.addEventListener('scroll', onChange);
   }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
