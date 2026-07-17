@@ -178,7 +178,9 @@
   <div class="wrap">
     <div class="searchrow" id="searchRow">
       <div class="search" id="searchBox">
-        <input id="q" type="search" placeholder="Search…" aria-label="Search">
+        <!-- enterkeyhint gives iOS a real "Search" action key instead of a plain
+             return; pressing it blurs the field (see JS) to dismiss the keyboard -->
+        <input id="q" type="search" enterkeyhint="search" placeholder="Search…" aria-label="Search">
         <button class="searchclose" id="searchClose" type="button" aria-label="Clear search">×</button>
       </div>
       <button class="filterbtn" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel"><span class="flabel">Filter</span><span class="chev">▾</span></button>
@@ -480,9 +482,14 @@
   const searchbarSpacer = document.getElementById('searchbarSpacer');
   const vv = window.visualViewport;
 
+  // Write the position synchronously (no rAF): the bar must land in the same frame
+  // the browser paints the scroll, otherwise it visibly lags a frame behind and
+  // stutters when scrolling fast. Skipping redundant writes keeps this cheap.
   function pinBarToVisibleTop(){
     if(!searchbarEl.classList.contains('kbd-fixed')) return;
-    searchbarEl.style.transform = `translateY(${vv ? vv.offsetTop : 0}px)`;
+    const y = vv ? vv.offsetTop : 0;
+    const next = y ? `translateY(${y}px)` : '';
+    if(searchbarEl.style.transform !== next) searchbarEl.style.transform = next;
   }
   if(vv){
     vv.addEventListener('scroll', pinBarToVisibleTop);
@@ -509,8 +516,17 @@
     pinBarToVisibleTop();
   }
 
-  searchInput.addEventListener('focus', pinBar);
+  // Pin on pointerdown/touchstart — i.e. BEFORE focus. The remaining bump was the
+  // browser's own "scroll the focused element into view": while the bar is merely
+  // stuck, the input's layout position is way up the page, so focusing it scrolls
+  // there. Switching to fixed first means the input already sits where it'll end
+  // up, so the browser sees it fully visible and has nothing to scroll to.
+  searchInput.addEventListener('pointerdown', pinBar);
+  searchInput.addEventListener('touchstart', pinBar, {passive:true});
+  searchInput.addEventListener('focus', pinBar);   // fallback (e.g. keyboard tab-focus)
   searchInput.addEventListener('blur', unpinBar);
+  // let the keyboard's Search key dismiss itself
+  searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
