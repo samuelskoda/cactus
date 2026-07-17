@@ -17,7 +17,7 @@
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35); }
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth;overflow-anchor:none}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   a{color:var(--accent)}
@@ -33,12 +33,13 @@
 
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:26px}
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
   .searchrow{position:relative;display:flex;gap:8px;align-items:center;justify-content:center}
   .search{position:relative;flex:0 1 260px;min-width:0}
-  /* font-size:16px keeps iOS from auto-zooming when the field is tapped */
-  .search input{width:100%;padding:9px 30px 9px 12px;border:1px solid var(--line);border-radius:10px;
-    background:var(--panel);color:var(--ink);font-size:16px}
+  /* font-size:16px keeps iOS from auto-zooming when the field is tapped; explicit
+     height keeps it the same size as the Filter button despite the bigger font */
+  .search input{width:100%;height:38px;box-sizing:border-box;padding:0 30px 0 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:16px}
   /* field × clears the search text (only shown when there's text) */
   .searchclose{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;
     border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;padding:2px 6px}
@@ -46,9 +47,10 @@
   .search.hastext .searchclose{display:block}
   /* the Filters button that toggles the dropdown */
   .filterbtn{display:flex;gap:6px;align-items:center;white-space:nowrap;cursor:pointer;
-    border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 14px;border-radius:10px;font-size:.9rem}
+    height:38px;box-sizing:border-box;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);padding:0 14px;border-radius:10px;font-size:.9rem}
   .filterbtn:hover{border-color:var(--accent)}
-  .filterbtn .chev{font-size:1.15em;line-height:1;transition:transform .15s ease}
+  .filterbtn .chev{font-size:1.5em;line-height:1;transition:transform .15s ease}
   .filterbtn[aria-expanded="true"] .chev{transform:rotate(180deg)}
   /* reserve the bold width so the button doesn't resize when a filter is active */
   .filterbtn .flabel{display:inline-flex;flex-direction:column}
@@ -82,11 +84,11 @@
   }
 
   .count{color:var(--muted);font-size:.85rem;margin:0 0 14px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-bottom:60px}
+  /* overflow-anchor:none stops the browser from "correcting" scroll position on its
+     own when we wipe and rebuild every card — that fight is what broke scrollToResults() */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-bottom:60px;overflow-anchor:none}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column;
-    transition:transform .12s ease, box-shadow .12s ease}
-  .card:hover{transform:translateY(-3px);box-shadow:0 6px 14px rgba(50,45,30,.1),0 18px 40px rgba(50,45,30,.12)}
+    overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column}
   .thumb{aspect-ratio:3/4;background:var(--sand);overflow:hidden}
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .card .body{padding:12px 13px 14px}
@@ -136,8 +138,8 @@
   @media (max-width:640px){
     .sheet{grid-template-columns:1fr}
     .sheet img{max-height:44vh}
-    .close{position:fixed;top:20px;right:20px;width:34px;height:34px;border-radius:50%;padding:0;
-      background:rgba(20,18,12,.55);color:#fff;font-size:1.4rem;display:flex;align-items:center;justify-content:center}
+    .close{position:fixed;top:14px;right:14px;width:44px;height:44px;border-radius:50%;padding:0;
+      background:rgba(20,18,12,.55);color:#fff;font-size:1.7rem;display:flex;align-items:center;justify-content:center}
   }
   footer{color:var(--muted);font-size:.8rem;text-align:center;padding:30px 20px 50px;border-top:1px solid var(--line)}
   /* touch devices: neutralise hover styles so they don't "stick" after a tap */
@@ -145,7 +147,6 @@
     .searchclose:hover{color:var(--muted)}
     .filterbtn:hover{border-color:var(--line)}
     .chip:hover{opacity:1}
-    .card:hover{transform:none;box-shadow:var(--shadow)}
     .badge.click:hover{opacity:1}
     .xref:hover{border-bottom-color:color-mix(in srgb,var(--accent) 40%,transparent)}
   }
@@ -165,6 +166,7 @@
   </div>
 </header>
 
+<div id="scrollAnchor" style="height:0"></div>
 <div class="searchbar">
   <div class="wrap">
     <div class="searchrow" id="searchRow">
@@ -194,8 +196,9 @@
 </div>
 
 <footer class="wrap">
-  Identifications are best-effort and not authoritative — some, marked <span class="badge q">tentative</span>, are uncertain and may be wrong.
+  Identifications are best-effort and not authoritative — some are uncertain and may be wrong.
 </footer>
+<div id="scrollPad" style="height:0"></div>
 
 <script src="data.js"></script>
 <script>
@@ -255,9 +258,11 @@
   }
 
   document.getElementById('q').addEventListener('input', e=>{
+    const hadText = state.q.length>0;
     state.q=e.target.value.toLowerCase().trim();
     document.getElementById('searchBox').classList.toggle('hastext', e.target.value.length>0);
     render();
+    if(!hadText && state.q.length>0) scrollToResults();   // first keystroke: bring results into view
   });
 
   // ---- render grid
@@ -281,6 +286,13 @@
     </article>`;
   }
   function render(){
+    // Pre-grow the spacer BEFORE the grid changes, using only measurements of
+    // the OLD (still on-screen) grid. If we waited to measure until after a
+    // big shrink (e.g. down to one card), the read alone can force the browser
+    // to clamp the scroll position — a jump right before our smooth scroll
+    // animates. Growing first, conservatively, makes that shrink impossible.
+    growPadForWorstCase();
+
     const list=data.filter(match).sort((a,b)=>{
       const am=isMixed(a), bm=isMixed(b);
       if(am!==bm) return am?1:-1;               // Mixed & offshoots always last
@@ -291,6 +303,34 @@
       `${list.length} of ${data.length} plants` +
       (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'') + (state.tentative?' · Tentative':'');
     document.getElementById('filterToggle').classList.toggle('active', !!(state.region||state.genus||state.tentative));
+
+    // Only grow further here (rare — the worst-case estimate above already
+    // covers a normal shrink); never shrink immediately. Shrinking back down
+    // to the exact minimal size is deferred until scrolling has settled.
+    growPadForWorstCase();
+    clearTimeout(trimPadTimer);
+    trimPadTimer = setTimeout(trimPadToMinimal, 500);
+  }
+  // grow the bottom spacer so there's always enough page to scroll the search
+  // bar to the top, even when a filter leaves just one row of results
+  function growPadForWorstCase(){
+    const pad=document.getElementById('scrollPad');
+    if(!pad) return;
+    const currentPad = pad.offsetHeight;
+    const gridHeight = grid.offsetHeight;
+    const otherHeight = (document.documentElement.scrollHeight - currentPad) - gridHeight;
+    // assume the grid could shrink all the way to nothing — a safe upper bound
+    const worstCaseNeeded = window.scrollY + window.innerHeight - otherHeight;
+    if(worstCaseNeeded > currentPad) pad.style.height = worstCaseNeeded + 'px';
+  }
+  let trimPadTimer=null;
+  function trimPadToMinimal(){
+    const pad=document.getElementById('scrollPad'), anchor=document.getElementById('scrollAnchor');
+    if(!pad || !anchor) return;
+    const currentPad = pad.offsetHeight;
+    const contentHeight = document.documentElement.scrollHeight - currentPad;
+    const minimal = Math.max(0, anchor.offsetTop + window.innerHeight - contentHeight);
+    if(minimal !== currentPad) pad.style.height = minimal + 'px';
   }
 
   // ---- modal
@@ -330,20 +370,37 @@
   }
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
-  // menu chips: toggle this filter (clearing the others)
+  // scroll so the sticky search bar sits at the top with the first result just below it
+  function scrollToResults(){
+    const anchor=document.getElementById('scrollAnchor');
+    if(!anchor) return;
+    // offsetTop on the sticky search bar itself is unreliable once it's "stuck"
+    // in some browsers, so target a plain (non-sticky) marker just above it and
+    // compute its position fresh each time via getBoundingClientRect + scrollY.
+    const doScroll=()=>{
+      const target = window.scrollY + anchor.getBoundingClientRect().top;
+      window.scrollTo({top: Math.max(0, target), behavior:'smooth'});
+    };
+    doScroll();
+    requestAnimationFrame(doScroll);
+    setTimeout(doScroll, 120);
+  }
+  // menu chips: toggle this filter (clearing the others), then close the dropdown
   function selectFilter(key, value){
     const target = key==='tentative' ? true : value;
     const wasActive = state[key] === target;
     clearFilters();
     if(!wasActive) state[key] = target;
     syncChips(); render();
+    closePanel();
+    scrollToResults();
   }
   // modal tags: make this the only active filter, then close
   function applyFilter(key, value){
     clearFilters();
     state[key] = key==='tentative' ? true : value;
     syncChips(); render(); closeModal();
-    window.scrollTo({top:0, behavior:'smooth'});
+    scrollToResults();
   }
   // turn "#plant-id" cross-references in a blurb into links that open that plant
   function linkifyBlurb(text){
@@ -395,6 +452,7 @@
     render(); searchInput.blur();
   });
 
+  window.addEventListener('resize', trimPadToMinimal);
   render();
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
