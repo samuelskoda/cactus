@@ -539,13 +539,23 @@
     requestAnimationFrame(restore);
     setTimeout(restore, 100);
   }
-  if(window.visualViewport){
-    let vvTimer=null;
-    window.visualViewport.addEventListener('resize', ()=>{   // fires on keyboard open and close
-      clearTimeout(vvTimer);
-      vvTimer=setTimeout(rebuildBarBlur, 250);               // wait out the keyboard animation
-    });
+  // The rebuild only sticks on a still page. Dismissing the keyboard by scrolling (see
+  // the touchmove handler above) fires the viewport resize while the finger — and then
+  // momentum — is still going, and a rebuild attempted mid-scroll is composited away and
+  // lost, leaving the snapshot stale. Tapping the keyboard away has no scroll in flight,
+  // which is why only that one worked. So wait for the viewport AND the scrolling to
+  // settle: any scroll re-arms the timer, so the rebuild lands once everything stops.
+  let settleTimer=null, rebuildPending=false;
+  function scheduleBarRebuild(){
+    rebuildPending=true;
+    clearTimeout(settleTimer);
+    settleTimer=setTimeout(()=>{ rebuildPending=false; rebuildBarBlur(); }, 250);
   }
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', scheduleBarRebuild);  // keyboard open/close
+  }
+  // only postpones a rebuild that's already due — normal scrolling never triggers one
+  window.addEventListener('scroll', ()=>{ if(rebuildPending) scheduleBarRebuild(); }, {passive:true});
   // Tapping the field scrolls the bar to the top, same as typing does. Besides being
   // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
   // exists only to lift the focused input clear of the keyboard, so if we've already
