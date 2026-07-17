@@ -606,8 +606,11 @@
       // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
       // has actually held, not merely the events.
       if(Math.abs(window.scrollY - armedScrollY) > 1){ arm(); return; }
-      // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
-      if(keyboardUp()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      // Pin to fixed ONLY when there's an actual viewport pan to correct (offsetTop well
+      // above 0). With the instant focus scroll iOS no longer pans, so offsetTop stays ~0
+      // and the bar just stays plain sticky — never switching fixed<->sticky, which is the
+      // switch that flickered. The pin remains a fallback for the case iOS pans anyway.
+      if(keyboardUp() && Math.round(vv.offsetTop) > 24) pinFixed(Math.round(vv.offsetTop));
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
