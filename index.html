@@ -39,8 +39,6 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
     backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* while the keyboard is open, fixed tracks the visual viewport more reliably than sticky */
-  .searchbar.kbd-fixed{position:fixed;left:0;right:0}
   .searchrow{position:relative;display:flex;gap:8px;align-items:center;justify-content:center}
   .search{position:relative;flex:0 1 260px;min-width:0}
   /* font-size:16px keeps iOS from auto-zooming when the field is tapped; explicit
@@ -178,7 +176,6 @@
 </header>
 
 <div id="scrollAnchor" style="height:0"></div>
-<div id="searchbarSpacer" style="height:0"></div>
 <div class="searchbar">
   <div class="wrap">
     <div class="searchrow" id="searchRow">
@@ -473,76 +470,17 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Keeping the bar pinned while the mobile keyboard is open.
-  //
-  // When the keyboard opens, iOS shrinks the *visual* viewport (what you can see)
-  // but leaves the *layout* viewport full-size. position:sticky and position:fixed
-  // both anchor to the layout viewport, so the bar sits at the top of a region
-  // that's partly hidden behind/above the visible area — it "unsticks" and drifts
-  // as you scroll. visualViewport.offsetTop reports how far the visible area has
-  // been panned down inside the layout viewport, so translating the bar by that
-  // amount puts it back at the top of what's actually on screen.
-  const searchbarEl = document.querySelector('.searchbar');
-  const searchbarSpacer = document.getElementById('searchbarSpacer');
-  const vv = window.visualViewport;
-
-  // Document Y where the spacer (the bar's old flow slot) begins. While pinned we
-  // clamp the bar here so it never floats above its resting place under the stats.
-  let barAnchorTop = 0;
-
-  // Write the position synchronously (no rAF): the bar must land in the same frame
-  // the browser paints the scroll, otherwise it visibly lags a frame behind and
-  // stutters when scrolling fast. Skipping redundant writes keeps this cheap.
-  function pinBarToVisibleTop(){
-    if(!searchbarEl.classList.contains('kbd-fixed')) return;
-    const vTop = vv ? vv.offsetTop : 0;         // top of the visible area (keyboard pans this)
-    // How far the bar's anchor sits below the current visible top. Positive means
-    // we've scrolled up past the anchor — the bar must ride down with the page so
-    // it stays below the stats instead of clinging to the top.
-    const belowTop = Math.max(0, barAnchorTop - window.scrollY);
-    const y = vTop + belowTop;
-    const next = y ? `translateY(${y}px)` : '';
-    if(searchbarEl.style.transform !== next) searchbarEl.style.transform = next;
-  }
-  function unpinBar(){
-    searchbarEl.classList.remove('kbd-fixed');
-    searchbarEl.style.transform = '';
-    searchbarSpacer.style.height = '0px';
-  }
-  function pinBar(){
-    if(searchbarEl.classList.contains('kbd-fixed')) return;
-    // Only take over when the bar is already at the top — never yank it there,
-    // that would be the unwanted jump-on-tap.
-    if(searchbarEl.getBoundingClientRect().top > 1) return;
-    // The spacer must replace the bar's FULL flow footprint: height *plus*
-    // margin-bottom. Replacing only the height drops the margin and pulls
-    // everything below up by that much (the 12px bump on focus).
-    const cs = getComputedStyle(searchbarEl);
-    const footprint = searchbarEl.getBoundingClientRect().height + (parseFloat(cs.marginBottom) || 0);
-    // remember where the bar's flow slot lives in the document
-    barAnchorTop = searchbarSpacer.getBoundingClientRect().top + window.scrollY;
-    searchbarSpacer.style.height = footprint + 'px';
-    searchbarEl.classList.add('kbd-fixed');
-    pinBarToVisibleTop();
-  }
-
-  // Fallback pinning, LAZY: with interactive-widget=resizes-content (viewport meta)
-  // a supporting browser shrinks the layout viewport for the keyboard, sticky keeps
-  // working natively, vv.offsetTop stays 0, and none of this ever engages — which
-  // is the smooth path (no fixed-switch on tap, no JS chasing the compositor).
-  // Only when the browser instead PANS the visual viewport (offsetTop > 0 while
-  // the field is focused) do we take over with fixed positioning.
-  function maybePin(){
-    if(document.activeElement !== searchInput) return;
-    if(vv && vv.offsetTop > 0 && !searchbarEl.classList.contains('kbd-fixed')) pinBar();
-    pinBarToVisibleTop();
-  }
-  if(vv){
-    vv.addEventListener('scroll', maybePin);
-    vv.addEventListener('resize', maybePin);
-  }
-  window.addEventListener('scroll', pinBarToVisibleTop, {passive:true});
-  searchInput.addEventListener('blur', unpinBar);
+  // Mobile keyboard vs the sticky bar: while the keyboard is open, iOS pans the
+  // visual viewport and sticky (layout-viewport-anchored) drifts. Chasing it with
+  // JS transforms stutters — iOS scrolls on the compositor thread, so JS always
+  // lands a frame late. Instead: the moment a scroll gesture starts, dismiss the
+  // keyboard. Scrolling then only ever happens with the keyboard closed, where
+  // sticky is natively smooth. (touchmove = a real finger drag; programmatic
+  // scrolls like scrollToResults() don't fire it, so typing keeps the keyboard.)
+  const searchRowEl = document.getElementById('searchRow');
+  document.addEventListener('touchmove', e=>{
+    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)) searchInput.blur();
+  }, {passive:true});
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
