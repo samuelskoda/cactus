@@ -94,7 +94,7 @@ window.CACTI = [
   { id: "29-parodia-erubescens", file: "photos/29-parodia-erubescens/IMG_9498.jpeg", name: "Parodia × erubescens", tag: "Parodia × erubescens", genus: ["Parodia"], region: ["Southern South America"], origin: "Uruguay (hybrid)",
     blurb: "A ribbed green globe with reddish spines, here pushing out a bright bud. This is a documented natural hybrid — Parodia × erubescens (Osten) D.R.Hunt, a cross of P. mammulosa × P. concinna from Uruguay (both formerly Notocactus). Like its parents it's an easy, generous flowerer that enjoys bright light and a little more water than desert cacti." },
 
-  { id: "5-coryphantha-elephantidens", file: "photos/5-coryphantha-elephantidens/IMG_9499.jpeg", name: "Coryphantha elephantidens", tag: "Coryphantha elephantidens", genus: ["Coryphantha"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+  { id: "5-coryphantha-elephantidens", file: "photos/5-coryphantha-elephantidens/IMG_9499.jpeg", files: ["photos/5-coryphantha-elephantidens/IMG_9499.jpeg", "photos/5-coryphantha-elephantidens/IMG_7042.jpeg"], name: "Coryphantha elephantidens", tag: "Coryphantha elephantidens", genus: ["Coryphantha"], region: ["Mexico & SW USA"], origin: "Central Mexico",
     blurb: "A fat, glossy dark-green plant with big rounded tubercles that give it its name — the 'elephant's tooth' cactus. From a woolly crown it opens large, silky pink flowers in late summer. Wants warmth, sun and a dry winter." },
 
   { id: "21-mammillaria-compressa", file: "photos/21-mammillaria-compressa/IMG_9500.jpeg", name: "Mammillaria compressa", tag: "— (tag not legible; identified by owner)", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
@@ -103,7 +103,7 @@ window.CACTI = [
   { id: "15-gymnocalycium-saglionis", file: "photos/15-gymnocalycium-saglionis/IMG_9501.jpeg", name: "Gymnocalycium saglionis", tag: "Gymnocalycium saglionis", genus: ["Gymnocalycium"], region: ["Southern South America"], origin: "N Argentina",
     blurb: "A grey-green 'chin cactus' with broad tubercles and strong, curved spines. Gymnocalyciums tolerate a little more shade than most cacti and open naked-tubed flowers (the name means 'naked calyx'). Slow, tough and long-lived — the smaller of the two saglionis here." },
 
-  { id: "9-echinopsis-ancistrophora", file: "photos/9-echinopsis-ancistrophora/IMG_9502.jpeg", name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Andes"], origin: "Argentina & Bolivia (E Andes)",
+  { id: "9-echinopsis-ancistrophora", file: "photos/9-echinopsis-ancistrophora/IMG_9502.jpeg", files: ["photos/9-echinopsis-ancistrophora/IMG_9502.jpeg", "photos/9-echinopsis-ancistrophora/IMG_7141.jpeg"], name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Andes"], origin: "Argentina & Bolivia (E Andes)",
     blurb: "A second ancistrophora — a ribbed globe with spines pressed close to the body and, in season, big pale funnel flowers on long tubes. Quick and easy in sun." },
 
   { id: "25-mammillaria-matudae", file: "photos/25-mammillaria-matudae/IMG_9503.jpeg", name: "Mammillaria matudae", tag: "Mammillaria matudae", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico (Guerrero)",
@@ -115,7 +115,7 @@ window.CACTI = [
   { id: "16-gymnocalycium-saglionis", file: "photos/16-gymnocalycium-saglionis/IMG_9505.jpeg", name: "Gymnocalycium saglionis", tag: "Gymnocalycium saglionis", genus: ["Gymnocalycium"], region: ["Southern South America"], origin: "N Argentina",
     blurb: "A large, solitary globe with broad tubercles and stout, curved spines — a well-grown chin cactus. Small pink-white flowers ring the top in summer. Slow but very long-lived and undemanding." },
 
-  { id: "23-mammillaria-hahniana", file: "photos/23-mammillaria-hahniana/IMG_9506.jpeg", name: "Mammillaria hahniana", tag: "Mammillaria hahniana", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+  { id: "23-mammillaria-hahniana", file: "photos/23-mammillaria-hahniana/IMG_9506.jpeg", files: ["photos/23-mammillaria-hahniana/IMG_9506.jpeg", "photos/23-mammillaria-hahniana/IMG_9258.jpeg"], name: "Mammillaria hahniana", tag: "Mammillaria hahniana", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
     blurb: "The 'old lady cactus' — a globe wrapped in long white hairs and short spines that give it a soft, whiskery look. A ring of deep magenta flowers crowns it in spring. Loves sun; keep the hairs dry to stay white." },
 
   { id: "19-mammillaria-bombycina", file: "photos/19-mammillaria-bombycina/IMG_9507.jpeg", name: "Mammillaria bombycina", tag: "Mammillaria bombycina", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
@@ -127,7 +127,7 @@ window.CACTI = [
   { id: "31-parodia-magnifica", file: "photos/31-parodia-magnifica/IMG_9509.jpeg", name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
     blurb: "The 'ball cactus' — a green ribbed body edged in soft golden spines, with a woolly crown and sulphur-yellow flowers. One of the collection's two magnifica; likes bright light and summer water." },
 
-  { id: "32-parodia-magnifica", file: "photos/32-parodia-magnifica/IMG_9513.jpeg", name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
+  { id: "32-parodia-magnifica", file: "photos/32-parodia-magnifica/IMG_9513.jpeg", files: ["photos/32-parodia-magnifica/IMG_9513.jpeg", "photos/32-parodia-magnifica/IMG_7170.jpeg"], name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
     blurb: "The second 'ball cactus' of the collection — a green ribbed body clothed in soft golden spines with a woolly crown and sulphur-yellow flowers. Bright light and summer water suit it." },
 
   { id: "27-mammillaria-vetula", file: "photos/27-mammillaria-vetula/IMG_9510.jpeg", name: "Mammillaria vetula", tag: "— (tag not legible; identified by owner)", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",

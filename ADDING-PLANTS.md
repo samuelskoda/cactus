@@ -12,7 +12,8 @@ then commit & push to publish.
    would otherwise sort earlier in the alphabetical grid.
 2. **Add the photo** to a folder named `<number>-<slug>` after the plant's `id`, e.g.
    `photos/38-mammillaria-elongata/IMG_9600.jpeg`. One folder per plant — it can hold several
-   photos (only the one named in `file` is shown for now).
+   photos. The one named in `file` is the thumbnail; to show the others too, list them all in
+   a `files` array (see field reference) and the detail view gets ‹ › arrows to flip through.
 3. **Copy the template below** into the `window.CACTI = [ … ]` array in `data.js` (anywhere;
    the site sorts alphabetically on its own).
 4. **Fill in the fields** (see reference below). Give it the **numbered `id`** from step 1.
@@ -47,6 +48,7 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 | `blurb` | Description paragraph shown in the detail view. To point at another plant, reference its `#id` (e.g. `#20-mammillaria-compressa`) — it renders as a clickable link showing just that plant's number (`#20`). |
 | `uncertain` | `true` → yellow **tentative** tag. Omit if confident. |
 | `species` | **Mixes only.** Array of the component species (see below). |
+| `files` | **Optional.** Array of photo paths when the plant has more than one — put the `file` photo first (it stays the grid thumbnail). The detail view shows ‹ › arrows and a photo counter. Omit for single-photo plants. |
 
 ## Special cases
 - **New genus** → also add a line to `window.GENUS_WIKI` (top of `data.js`):
