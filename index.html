@@ -444,7 +444,7 @@
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
   // scroll so the sticky search bar sits at the top with the first result just below it
-  function scrollToResults(){
+  function scrollToResults(instant){
     const anchor=document.getElementById('scrollAnchor');
     if(!anchor) return;
     // offsetTop on the sticky search bar itself is unreliable once it's "stuck"
@@ -452,7 +452,7 @@
     // compute its position fresh each time via getBoundingClientRect + scrollY.
     const doScroll=()=>{
       const target = window.scrollY + anchor.getBoundingClientRect().top;
-      window.scrollTo({top: Math.max(0, target), behavior:'smooth'});
+      window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
     };
     doScroll();
     requestAnimationFrame(doScroll);
@@ -660,17 +660,16 @@
   // element paints nothing until the compositor builds its layer. Removing the div, even
   // for a frame, therefore removes the bar. The glass is now pure CSS and permanent.
 
-  // Tapping the field scrolls the bar to the top, same as typing does. Besides being
-  // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
-  // exists only to lift the focused input clear of the keyboard, so if we've already
-  // put it at the top before the keyboard finishes animating in, iOS has nothing left
-  // to do and stays quiet — one deliberate scroll instead of a snap.
+  // Tapping the field scrolls the bar to the top INSTANTLY. A smooth scroll animates, and
+  // iOS runs its own scroll-into-view the moment the keyboard shows — mid-animation the
+  // input isn't at the top yet, so iOS pans the visual viewport (offsetTop jumps up) to
+  // reveal it. That pan is the whole reason the bar must pin to fixed and later hand back
+  // to sticky, and that handoff is what flickered. Landing the input at the top in ONE
+  // frame, before iOS looks, means it never pans — offsetTop stays ~0, the pin never moves
+  // the bar, and the fixed->sticky handoff is a true no-op at the same position.
   // Deliberately no growPadForWorstCase() here. Focus doesn't shrink the grid, so there's
   // nothing to make room for — render() already grew the pad when the filter changed it.
-  // Worse, growing it here sizes the pad off the CURRENT scrollY, so focusing part-way
-  // down the page inflated the document by hundreds of px; the next trim then yanked that
-  // back, relaying out the whole page mid-scroll and dropping the sticky bar for a frame.
-  searchInput.addEventListener('focus', scrollToResults);
+  searchInput.addEventListener('focus', ()=>scrollToResults(true));
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
