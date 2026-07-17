@@ -560,25 +560,35 @@
   // position:sticky;top:0 anchors to the layout viewport. When the keyboard opens, iOS
   // doesn't scroll the document to reveal the input — it pans the visual viewport inside
   // the layout viewport, so visualViewport.offsetTop goes positive and the layout
-  // viewport's top ends up above the screen. The bar then sticks faithfully to a point
-  // offsetTop px too high: half of it above the display, or all of it (which reads as the
-  // bar "disappearing"). That's the flicker — a misplacement, not a paint bug. It needs
-  // the keyboard because offsetTop is otherwise always 0, which is exactly why an
-  // unactivated bar never misbehaves.
-  // Matching top: to offsetTop puts it back on screen. This is NOT the old transform-
-  // chasing that stuttered: offsetTop only changes when the viewport actually pans
-  // (keyboard, pinch-zoom) — ordinary scrolling doesn't fire these events at all, so
-  // nothing runs per-frame while you scroll.
+  // viewport's top ends up above the screen. The bar then sticks to a point offsetTop px
+  // too high: half above the display, or all of it (which reads as the bar "disappearing").
+  // Not a paint bug — a misplacement. It needs the keyboard because offsetTop is otherwise 0.
+  //
+  // Doing this on visualViewport 'resize'/'scroll' events was NOT enough: those events land
+  // a frame behind the compositor, so the bar still drifted for the frames in between (worst
+  // as a slow scroll settles). The tell was the debug overlay — it merely READ the bar's
+  // rect every frame in a rAF loop and never moved it, yet the bug vanished, because a
+  // per-frame layout read forces the sticky position to re-sync with the compositor.
+  // So sync every frame while the viewport is actually panning, and stop once it settles
+  // (offsetTop back at 0 for a few frames and the field isn't focused) so nothing runs
+  // per-frame during ordinary scrolling.
   const vv = window.visualViewport;
   if(vv){
     const searchbarEl = document.querySelector('.searchbar');
-    const stickToVisualViewport = ()=>{
+    let rafId=0, settledFrames=0;
+    const syncFrame = ()=>{
       const t = Math.max(0, Math.round(vv.offsetTop));
       if(searchbarEl.style.top !== t+'px') searchbarEl.style.top = t+'px';
+      void searchbarEl.getBoundingClientRect().top;   // force the compositor re-sync (the debug overlay's real effect)
+      // keep going while the viewport is panned, the field is focused, or it only just settled
+      if(t!==0 || document.activeElement===searchInput) settledFrames=0; else settledFrames++;
+      if(settledFrames>=10){ rafId=0; return; }
+      rafId=requestAnimationFrame(syncFrame);
     };
-    vv.addEventListener('resize', stickToVisualViewport);
-    vv.addEventListener('scroll', stickToVisualViewport);
-    stickToVisualViewport();
+    const startSync = ()=>{ if(!rafId){ settledFrames=0; rafId=requestAnimationFrame(syncFrame); } };
+    vv.addEventListener('resize', startSync);   // keyboard open/close, pinch-zoom
+    vv.addEventListener('scroll', startSync);   // visual-viewport pan
+    searchInput.addEventListener('focus', startSync);
   }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
