@@ -568,10 +568,12 @@
   // exists only to lift the focused input clear of the keyboard, so if we've already
   // put it at the top before the keyboard finishes animating in, iOS has nothing left
   // to do and stays quiet — one deliberate scroll instead of a snap.
-  searchInput.addEventListener('focus', ()=>{
-    growPadForWorstCase();   // a 1-row filter may leave no room to scroll otherwise
-    scrollToResults();
-  });
+  // Deliberately no growPadForWorstCase() here. Focus doesn't shrink the grid, so there's
+  // nothing to make room for — render() already grew the pad when the filter changed it.
+  // Worse, growing it here sizes the pad off the CURRENT scrollY, so focusing part-way
+  // down the page inflated the document by hundreds of px; the next trim then yanked that
+  // back, relaying out the whole page mid-scroll and dropping the sticky bar for a frame.
+  searchInput.addEventListener('focus', scrollToResults);
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
@@ -594,7 +596,18 @@
     }, 300);
   });
 
-  window.addEventListener('resize', trimPadToMinimal);
+  // Only re-trim on a REAL resize (orientation change, desktop window drag), detected by a
+  // width change. On iOS, resize also fires every time Safari's toolbar collapses/expands —
+  // which happens as a scroll decelerates — and trimming there changes the document height
+  // mid-scroll, relaying out the page while it moves. Height-only resizes (toolbar, and the
+  // keyboard) are exactly the ones we must ignore; the pad is height-only anyway, so a
+  // width change is the only thing that can alter what "minimal" means.
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', ()=>{
+    if(window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    trimPadToMinimal();
+  });
   render();
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
