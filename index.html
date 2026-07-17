@@ -444,7 +444,7 @@
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
   // scroll so the sticky search bar sits at the top with the first result just below it
-  function scrollToResults(instant){
+  function scrollToResults(){
     const anchor=document.getElementById('scrollAnchor');
     if(!anchor) return;
     // offsetTop on the sticky search bar itself is unreliable once it's "stuck"
@@ -452,7 +452,7 @@
     // compute its position fresh each time via getBoundingClientRect + scrollY.
     const doScroll=()=>{
       const target = window.scrollY + anchor.getBoundingClientRect().top;
-      window.scrollTo({top: Math.max(0, target), behavior: instant===true?'instant':'smooth'});
+      window.scrollTo({top: Math.max(0, target), behavior:'smooth'});
     };
     doScroll();
     requestAnimationFrame(doScroll);
@@ -593,8 +593,7 @@
   // keyboard up = the layout is (or is about to be) in its shifted state
   const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
   if(vv){
-    let settleTimer=null, armedScrollY=0, suppress=false;
-    const maxScrollY = ()=> document.documentElement.scrollHeight - window.innerHeight;
+    let settleTimer=null, armedScrollY=0;
     function arm(){
       clearTimeout(settleTimer);
       armedScrollY = window.scrollY;
@@ -607,58 +606,18 @@
       // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
       // has actually held, not merely the events.
       if(Math.abs(window.scrollY - armedScrollY) > 1){ arm(); return; }
-      if(keyboardUp()){
-        const off = Math.round(vv.offsetTop);
-        if(off > 0 && window.scrollY + off <= maxScrollY()){
-          // Convert the keyboard's pan into real scroll. Visually identical (scrollY+off
-          // while offsetTop collapses to 0), but now the pinned spot IS the sticky spot
-          // (top:0), so the keyboard close has NOTHING to animate at the top. The "jump
-          // down after X" was unfixable by chasing: offsetTop collapses on the compositor
-          // between events, leaving the bar parked at a stale offset mid-screen. With the
-          // pan pre-converted, there is no stale offset to park at.
-          suppress=true;                       // our own scroll — don't let it unpin
-          // behavior:'instant' is essential: html has scroll-behavior:smooth, so a plain
-          // scrollTo ANIMATES — a visible slide down right after tapping search. The
-          // conversion is only invisible if it happens within a single frame.
-          window.scrollTo({left:0, top: window.scrollY + off, behavior:'instant'});
-          setTimeout(()=>{ suppress=false; }, 80);
-          pinFixed(Math.max(0, Math.round(vv.offsetTop)));
-          armedScrollY = window.scrollY;
-          // offsetTop may update async after the scroll; correct the pin once it lands
-          setTimeout(()=>{ if(pinned && keyboardUp())
-            searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop))+'px'; }, 60);
-        } else {
-          pinFixed(Math.max(0, off));
-        }
-      } else goSticky();
+      // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
+      if(keyboardUp()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
-    // Bottom rubber-band: iOS detaches sticky during the bounce. iOS may CLAMP
-    // window.scrollY at max during overscroll — the overshoot shows up in
-    // visualViewport.pageTop instead, which is why a scrollY-only check never fired
-    // ("detached bar at the bottom not resolved"). Check both.
-    const bottomBounce = ()=> !keyboardUp() &&
-      (window.scrollY > maxScrollY()+1 || vv.pageTop > maxScrollY()+1);
     function onChange(){
-      // Suppressed events (our own pan-conversion scroll) still re-arm the settle, so a
-      // real event swallowed by the window can't leave the state machine asleep.
-      if(suppress){ arm(); return; }
-      if(bottomBounce()){
-        // Pin fixed, following offsetTop — in overscroll the visual viewport pans BEYOND
-        // the layout viewport (offsetTop positive), so top:0 would hang the bar above the
-        // visible area; top:=offsetTop hugs the visible top through the bounce.
-        pinFixed(Math.max(0, Math.round(vv.offsetTop)));
-        arm();
-        return;
-      }
-      if(pinned && !keyboardUp() && Math.abs(window.scrollY - armedScrollY) <= 1){
-        // Keyboard closing while pinned AND the page is still (the X case): hold the
-        // visible top by following offsetTop per event (usually already 0 thanks to the
-        // pan conversion above, so the fixed->sticky handoff has nothing to move).
-        // When the page IS scrolling (scroll-dismissed keyboard), chasing lags a frame
-        // per event — that wobble was the residual stop flicker — so ride as sticky
-        // through the scroll instead and let the settle sort it out.
+      if(pinned && !keyboardUp()){
+        // Keyboard closing while pinned (e.g. after X): keep the bar at the visible top by
+        // following offsetTop per event. Going sticky here re-anchored the bar offsetTop px
+        // ABOVE the visible area — it vanished upward and slid back down, the "jump" after
+        // X. offsetTop ends at 0, so the eventual fixed->sticky handoff is seamless.
         searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop))+'px';
       } else {
         // viewport in motion (keyboard sliding, or a pan): ride the content as a sticky
@@ -669,22 +628,19 @@
     }
     vv.addEventListener('resize', onChange);
     vv.addEventListener('scroll', onChange);
+    const maxScrollY = ()=> document.documentElement.scrollHeight - window.innerHeight;
     // Ordinary page scrolling fires neither vv event, so without this the settle timer
     // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
     // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
     window.addEventListener('scroll', ()=>{
-      if(suppress) return;
-      if(bottomBounce()){
-        pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      if(!keyboardUp() && window.scrollY > maxScrollY()+1){
+        // Bottom rubber-band: iOS detaches sticky during the bounce (the bar slid away
+        // with the content even with no keyboard involved). A fixed element doesn't
+        // bounce, and fixed;top:0 is the exact visual spot the stuck bar occupies, so the
+        // pin is invisible — it just holds the bar still until the bounce settles.
+        pinFixed(0);
         arm();
-        return;
-      }
-      if(!(pinned || settleTimer)) return;
-      // iOS fires a final stationary scroll event after the page stops; unpinning on it
-      // and re-pinning at the next settle was the residual stop flicker. Position echoes
-      // at the settled spot are ignored.
-      if(pinned && Math.abs(window.scrollY - armedScrollY) <= 1) return;
-      onChange();
+      } else if(pinned || settleTimer) onChange();
     }, {passive:true});
   }
 
@@ -695,18 +651,17 @@
   // element paints nothing until the compositor builds its layer. Removing the div, even
   // for a frame, therefore removes the bar. The glass is now pure CSS and permanent.
 
-  // Tapping the field scrolls the bar to the top, same as typing does — INSTANTLY, not
-  // smooth. iOS computes its scroll-into-view the moment the keyboard shows; with a smooth
-  // scroll still animating, the input isn't in place yet, so iOS pans the visual viewport
-  // (offsetTop 300) — the bar rode up out of view and the later pan-conversion snapped it
-  // back down, a visible jump. With an instant scroll the input is already at the top
-  // before the keyboard lays out: no pan, nothing to convert, no jump.
+  // Tapping the field scrolls the bar to the top, same as typing does. Besides being
+  // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
+  // exists only to lift the focused input clear of the keyboard, so if we've already
+  // put it at the top before the keyboard finishes animating in, iOS has nothing left
+  // to do and stays quiet — one deliberate scroll instead of a snap.
   // Deliberately no growPadForWorstCase() here. Focus doesn't shrink the grid, so there's
   // nothing to make room for — render() already grew the pad when the filter changed it.
   // Worse, growing it here sizes the pad off the CURRENT scrollY, so focusing part-way
   // down the page inflated the document by hundreds of px; the next trim then yanked that
   // back, relaying out the whole page mid-scroll and dropping the sticky bar for a frame.
-  searchInput.addEventListener('focus', ()=>scrollToResults(true));
+  searchInput.addEventListener('focus', scrollToResults);
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
@@ -774,17 +729,14 @@
       const top=bar.getBoundingClientRect().top;   // silent read — proven not to mask
       if(top < worst-0.5){                          // NEW worst only → rare repaint
         worst=top;
-        const maxY = document.documentElement.scrollHeight - window.innerHeight;
         hits.unshift({
           barTop:Math.round(top),
           pos: getComputedStyle(bar).position,        // sticky = pin didn't engage; fixed = fixed also broke
           pinned: bar.classList.contains('pinned')?'Y':'-',
           offsetTop: vv?Math.round(vv.offsetTop):'n/a',
-          // bounce diagnostics: positive = overscrolled past the bottom, and by which value
-          overSY: Math.round(window.scrollY - maxY),
-          overPT: vv?Math.round(vv.pageTop - maxY):'n/a',
           vvHeight: vv?Math.round(vv.height):'n/a',
           scrollY:Math.round(window.scrollY),
+          innerH:window.innerHeight,
           focused: document.activeElement===document.getElementById('q')?'Y':'-',
         });
         hits.length=Math.min(hits.length,10);
