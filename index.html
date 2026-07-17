@@ -509,6 +509,15 @@
   document.addEventListener('touchmove', e=>{
     if(document.activeElement === searchInput && !searchRowEl.contains(e.target)) searchInput.blur();
   }, {passive:true});
+  // Tapping the field scrolls the bar to the top, same as typing does. Besides being
+  // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
+  // exists only to lift the focused input clear of the keyboard, so if we've already
+  // put it at the top before the keyboard finishes animating in, iOS has nothing left
+  // to do and stays quiet — one deliberate scroll instead of a snap.
+  searchInput.addEventListener('focus', ()=>{
+    growPadForWorstCase();   // a 1-row filter may leave no room to scroll otherwise
+    scrollToResults();
+  });
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
@@ -516,6 +525,19 @@
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
     scrollToResults();
+  });
+
+  // loading="lazy" keeps the first paint cheap, but it also means a card sitting far
+  // down the page still has no image when a filter pulls it up into view — it renders
+  // blank for a beat, then pops in. That's the intermittent flash, and why it only hits
+  // photos you haven't scrolled past yet. Once the page itself has loaded, quietly warm
+  // the rest (flipping lazy->eager resumes the deferred fetch) so filtering never lands
+  // on an unloaded image. The whole set is ~16 MB, and it's the same bytes you'd pull by
+  // scrolling to the bottom anyway — just fetched before they're needed instead of during.
+  window.addEventListener('load', ()=>{
+    setTimeout(()=>{
+      for(const img of grid.querySelectorAll('img[loading="lazy"]')) img.loading='eager';
+    }, 300);
   });
 
   window.addEventListener('resize', trimPadToMinimal);
