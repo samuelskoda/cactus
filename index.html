@@ -42,6 +42,10 @@
      height keeps it the same size as the Filter button despite the bigger font */
   .search input{width:100%;height:38px;box-sizing:border-box;padding:0 30px 0 12px;
     border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:16px}
+  /* type="search" keeps the iOS keyboard's "Search" action button; hide only
+     its native round clear-× so our own custom one (searchclose) is the only one */
+  .search input::-webkit-search-cancel-button,
+  .search input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
   /* field × clears the search text (only shown when there's text) */
   .searchclose{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:none;
     border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:1.6rem;line-height:1;padding:2px 6px}
@@ -174,7 +178,7 @@
   <div class="wrap">
     <div class="searchrow" id="searchRow">
       <div class="search" id="searchBox">
-        <input id="q" type="text" placeholder="Search…" aria-label="Search">
+        <input id="q" type="search" placeholder="Search…" aria-label="Search">
         <button class="searchclose" id="searchClose" type="button" aria-label="Clear search">×</button>
       </div>
       <button class="filterbtn" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel"><span class="flabel">Filter</span><span class="chev">▾</span></button>
@@ -203,7 +207,10 @@
 </footer>
 <div id="scrollPad" style="height:0"></div>
 
-<script src="data.js"></script>
+<!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
+     (Safari in particular caches aggressively) never run it against a mismatched
+     index.html — a stale data.js here previously broke photo paths and clicks -->
+<script src="data.js?v=2"></script>
 <script>
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
@@ -341,7 +348,9 @@
   const cleanName = n => n.replace(/\s*\(.*\)/,'').trim();
   // ids are "<number>-<slug>" (e.g. "1-astrophytum-asterias") — the leading
   // number is the plant's permanent, human-facing number shown in the detail view
-  const numberOf = d => d.id.match(/^x?\d+/)[0];
+  // defensive: never throw on an unexpected id shape (e.g. a stale cached data.js
+  // mid-migration) — that would silently break the whole modal from opening
+  const numberOf = d => { const m = d && d.id && d.id.match(/^x?\d+/); return m ? m[0] : '?'; };
   function genusLinks(d){
     return asArr(d.genus).filter(g=>g!==SPECIAL).map(g=>
       wiki[g] ? `<a href="${wiki[g]}" target="_blank" rel="noopener">${g}</a>` : g
@@ -418,7 +427,11 @@
   }
   function openModal(id){
     const d=data.find(x=>x.id===id); if(!d) return;
-    location.hash=id;
+    try{ renderModal(d); } catch(err){ console.error('openModal failed:', err); return; }
+    modal.classList.add('open'); document.body.classList.add('noscroll'); modal.scrollTop=0;
+  }
+  function renderModal(d){
+    location.hash=d.id;
     sheet.innerHTML=`
       <img src="${d.file}" alt="${d.name}">
       <div class="info">
@@ -437,7 +450,6 @@
     sheet.querySelectorAll('[data-region]').forEach(el=>{ el.onclick=()=>applyFilter('region', el.dataset.region); });
     sheet.querySelectorAll('[data-tentative]').forEach(el=>{ el.onclick=()=>applyFilter('tentative'); });
     sheet.querySelectorAll('[data-goto]').forEach(el=>{ el.onclick=e=>{ e.preventDefault(); openModal(el.dataset.goto); }; });
-    modal.classList.add('open'); document.body.classList.add('noscroll'); modal.scrollTop=0;
   }
   function closeModal(){ modal.classList.remove('open'); document.body.classList.remove('noscroll'); if(location.hash) history.replaceState(null,'',location.pathname); }
   modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
@@ -466,7 +478,12 @@
   const searchbarSpacer = document.getElementById('searchbarSpacer');
   searchInput.addEventListener('focus', ()=>{
     if(searchbarEl.getBoundingClientRect().top <= 1){
-      searchbarSpacer.style.height = searchbarEl.getBoundingClientRect().height + 'px';
+      // The spacer must replace the bar's FULL flow footprint: its height *plus*
+      // its margin-bottom. Replacing only the height leaves the margin behind and
+      // yanks everything below up by that much — the "small bump" on focus.
+      const cs = getComputedStyle(searchbarEl);
+      const footprint = searchbarEl.getBoundingClientRect().height + (parseFloat(cs.marginBottom) || 0);
+      searchbarSpacer.style.height = footprint + 'px';
       searchbarEl.classList.add('kbd-fixed');
     }
   });
