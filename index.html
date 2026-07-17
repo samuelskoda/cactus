@@ -614,15 +614,20 @@
     }
     function onChange(){
       if(pinned){
-        // Keyboard closing (scroll-dismiss) or panning: follow the visible top by setting
-        // top:=offsetTop, and hand back to sticky ONLY once the keyboard is fully closed and
-        // the pan has settled to 0. Unpinning while offsetTop is still > 0 (keyboard only
-        // part-way closed) dropped the bar to its misplaced sticky spot for a frame — that
-        // was the flicker while slowly scrolling. At offsetTop 0 the fixed(top:0)->sticky
-        // (top:0) handoff is seamless.
+        // Keyboard closing (scroll-dismiss) or panning: keep the bar at the visible top
+        // (top:=offsetTop), handing back to sticky only once the keyboard is fully closed
+        // and the pan has settled to 0 (a seamless fixed(top:0)->sticky(top:0) handoff).
         const off = Math.max(0, Math.round(vv.offsetTop));
-        if(off === 0 && !keyboardUp()) goSticky();
-        else searchbarEl.style.top = off + 'px';
+        if(off === 0 && !keyboardUp()){ goSticky(); }
+        else {
+          // The bar must NEVER sit above its resting spot. Chasing offsetTop 1:1 copied the
+          // compositor's small jitter, which both wiggled the bar and occasionally lifted it
+          // a hair above. So: if offsetTop grew past our top, catch up immediately (that is
+          // the only way the bar could go above); if it merely shrank a little, hold until
+          // it's moved a few px, so sub-pixel jitter can't wiggle it.
+          const cur = parseFloat(searchbarEl.style.top) || 0;
+          if(off > cur || cur - off > 4) searchbarEl.style.top = off + 'px';
+        }
       }
       arm();
     }
