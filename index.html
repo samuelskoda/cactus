@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- interactive-widget=resizes-content: when the on-screen keyboard opens, shrink
+     the layout viewport instead of just panning the visual one. position:sticky
+     then keeps working natively — no JS repositioning (and none of its lag/stutter,
+     since iOS pans the viewport on the compositor thread, ahead of JS events).
+     Browsers without support ignore it and use the JS fallback pinning. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>My Cactus Collection</title>
 <style>
   :root{
@@ -499,12 +504,6 @@
     const next = y ? `translateY(${y}px)` : '';
     if(searchbarEl.style.transform !== next) searchbarEl.style.transform = next;
   }
-  if(vv){
-    vv.addEventListener('scroll', pinBarToVisibleTop);
-    vv.addEventListener('resize', pinBarToVisibleTop);
-  }
-  window.addEventListener('scroll', pinBarToVisibleTop, {passive:true});
-
   function unpinBar(){
     searchbarEl.classList.remove('kbd-fixed');
     searchbarEl.style.transform = '';
@@ -527,14 +526,22 @@
     pinBarToVisibleTop();
   }
 
-  // Pin on pointerdown/touchstart — i.e. BEFORE focus. The remaining bump was the
-  // browser's own "scroll the focused element into view": while the bar is merely
-  // stuck, the input's layout position is way up the page, so focusing it scrolls
-  // there. Switching to fixed first means the input already sits where it'll end
-  // up, so the browser sees it fully visible and has nothing to scroll to.
-  searchInput.addEventListener('pointerdown', pinBar);
-  searchInput.addEventListener('touchstart', pinBar, {passive:true});
-  searchInput.addEventListener('focus', pinBar);   // fallback (e.g. keyboard tab-focus)
+  // Fallback pinning, LAZY: with interactive-widget=resizes-content (viewport meta)
+  // a supporting browser shrinks the layout viewport for the keyboard, sticky keeps
+  // working natively, vv.offsetTop stays 0, and none of this ever engages — which
+  // is the smooth path (no fixed-switch on tap, no JS chasing the compositor).
+  // Only when the browser instead PANS the visual viewport (offsetTop > 0 while
+  // the field is focused) do we take over with fixed positioning.
+  function maybePin(){
+    if(document.activeElement !== searchInput) return;
+    if(vv && vv.offsetTop > 0 && !searchbarEl.classList.contains('kbd-fixed')) pinBar();
+    pinBarToVisibleTop();
+  }
+  if(vv){
+    vv.addEventListener('scroll', maybePin);
+    vv.addEventListener('resize', maybePin);
+  }
+  window.addEventListener('scroll', pinBarToVisibleTop, {passive:true});
   searchInput.addEventListener('blur', unpinBar);
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
