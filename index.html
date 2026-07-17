@@ -446,10 +446,16 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // field × just clears the search text
+  // Focusing the field on mobile can make the browser nudge the page as the
+  // keyboard opens (a small unwanted scroll), and the sticky bar can lose its
+  // anchored position while the keyboard is up. Re-asserting the intended
+  // scroll position right after focus fixes both in one go.
+  searchInput.addEventListener('focus', ()=> setTimeout(scrollToResults, 50));
+  // field × just clears the search text and scrolls back to the top, like unselecting a filter
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
+    scrollToResults();
   });
 
   window.addEventListener('resize', trimPadToMinimal);
