@@ -38,17 +38,12 @@
 
   /* Sticky bar: a search field + a separate Filters button */
   /* Frosted glass. The -webkit- prefix is required: Safari only supports the
-     unprefixed property from 18.
-     Deliberately NOT force-promoted with translateZ(0): a permanently composited
-     layer holds a backdrop snapshot that iOS invalidates when the keyboard resizes
-     the visual viewport, and it then re-reads it every frame — which showed up as
-     the bar flickering on scroll, but only once the keyboard had been opened and
-     closed. Letting Safari manage the layer itself avoids the stale snapshot. */
+     unprefixed property from 18. Not force-promoted with translateZ(0) — a
+     permanently composited layer made the iOS flicker worse, not better. */
   .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
     -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* No blur support (or blur disabled) -> fall back to an opaque bar so the
-     content underneath can't show through while it's stuck. */
+  /* No blur support -> opaque bar, so content can't show through while it's stuck. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
     .searchbar{background:var(--bg)}
   }
@@ -511,51 +506,36 @@
   // scrolls like scrollToResults() don't fire it, so typing keeps the keyboard.)
   const searchRowEl = document.getElementById('searchRow');
   document.addEventListener('touchmove', e=>{
-    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)) searchInput.blur();
+    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
+      searchInput.blur();
+      scheduleOutsideTap();   // scroll-dismissal leaves the blur flickering; see below
+    }
   }, {passive:true});
 
-  // iOS drops the blurred bar's backdrop snapshot when the keyboard resizes the visual
-  // viewport, then re-reads it every frame while scrolling — that's the flicker, and why
-  // it only ever started after the keyboard had been opened and closed. The layer stays
-  // stale until something forces it to rebuild, which is exactly what selecting a filter
-  // or tapping away was doing by hand. So do it deliberately once the viewport settles:
-  // drop the blur, let one frame paint without it, then put it back. The blip lands while
-  // the keyboard is still animating, so it isn't visible.
-  const barEl = document.querySelector('.searchbar');
-  function rebuildBarBlur(){
-    barEl.style.setProperty('-webkit-backdrop-filter','none');
-    barEl.style.setProperty('backdrop-filter','none');
-    void barEl.offsetHeight;                       // force layout, don't let the two writes coalesce
-    let restored=false;
-    const restore=()=>{
-      if(restored) return;
-      restored=true;
-      barEl.style.removeProperty('-webkit-backdrop-filter');
-      barEl.style.removeProperty('backdrop-filter');
-    };
-    // rAF gives the clean one-frame gap, but it's paused in background tabs — and a
-    // missed restore would strip the glass for good. The timeout guarantees it comes
-    // back either way; whichever fires first wins.
-    requestAnimationFrame(restore);
-    setTimeout(restore, 100);
+  // Dismissing the keyboard by scrolling leaves the sticky bar's blur flickering, while
+  // tapping outside clears it. So replay that tap ourselves, once the scroll has settled
+  // (any scroll re-arms the timer) — a tap fired mid-scroll wouldn't land on a still page.
+  // Caveat: the outside-click handler only calls closePanel(), which does nothing when the
+  // panel is already shut, so if the cure is really iOS re-compositing on a physical touch
+  // rather than anything in our JS, a synthetic event can't reproduce it.
+  function tapOutside(){
+    const t=document.body;
+    const o={bubbles:true, cancelable:true, view:window, clientX:2, clientY:2};
+    t.dispatchEvent(new PointerEvent('pointerdown',o));
+    t.dispatchEvent(new MouseEvent('mousedown',o));
+    t.dispatchEvent(new PointerEvent('pointerup',o));
+    t.dispatchEvent(new MouseEvent('mouseup',o));
+    t.dispatchEvent(new MouseEvent('click',o));   // target is body, so no card onclick fires
   }
-  // The rebuild only sticks on a still page. Dismissing the keyboard by scrolling (see
-  // the touchmove handler above) fires the viewport resize while the finger — and then
-  // momentum — is still going, and a rebuild attempted mid-scroll is composited away and
-  // lost, leaving the snapshot stale. Tapping the keyboard away has no scroll in flight,
-  // which is why only that one worked. So wait for the viewport AND the scrolling to
-  // settle: any scroll re-arms the timer, so the rebuild lands once everything stops.
-  let settleTimer=null, rebuildPending=false;
-  function scheduleBarRebuild(){
-    rebuildPending=true;
-    clearTimeout(settleTimer);
-    settleTimer=setTimeout(()=>{ rebuildPending=false; rebuildBarBlur(); }, 250);
+  let tapTimer=null, tapPending=false;
+  function scheduleOutsideTap(){
+    tapPending=true;
+    clearTimeout(tapTimer);
+    tapTimer=setTimeout(()=>{ tapPending=false; tapOutside(); }, 250);
   }
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', scheduleBarRebuild);  // keyboard open/close
-  }
-  // only postpones a rebuild that's already due — normal scrolling never triggers one
-  window.addEventListener('scroll', ()=>{ if(rebuildPending) scheduleBarRebuild(); }, {passive:true});
+  // only postpones a tap that's already due — normal scrolling never triggers one
+  window.addEventListener('scroll', ()=>{ if(tapPending) scheduleOutsideTap(); }, {passive:true});
+
   // Tapping the field scrolls the bar to the top, same as typing does. Besides being
   // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
   // exists only to lift the focused input clear of the keyboard, so if we've already
