@@ -635,49 +635,6 @@
   });
   render();
 
-  // ---- TEMPORARY diagnostic, only on ?debug=1 — remove once the bar misplacement is solved.
-  // The bar has been drawing above the visible area on iOS and none of the remote theories
-  // have held. This can't be reproduced off-device (no keyboard, no real scrolling), so
-  // instead of guessing again: watch the bar's true on-screen position every frame and
-  // snapshot the viewport state at the exact moment it goes off the top.
-  if(/(\?|&)debug=1/.test(location.search)){
-    const bar=document.querySelector('.searchbar');
-    const box=document.createElement('div');
-    box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;max-height:45vh;'+
-      'overflow:auto;background:rgba(0,0,0,.88);color:#0f0;font:10px/1.35 ui-monospace,monospace;'+
-      'padding:6px;white-space:pre;-webkit-user-select:text;user-select:text';
-    document.body.appendChild(box);
-    const vv=window.visualViewport;
-    const hits=[]; let worst=0, frames=0;
-    const fmt=n=>Math.round(n);
-    (function watch(){
-      frames++;
-      const top=bar.getBoundingClientRect().top;   // <0 means the bar is above the screen
-      if(top < worst-0.5){                          // only record when it gets WORSE
-        worst=top;
-        hits.unshift({
-          barTop:fmt(top),
-          styleTop:bar.style.top||'-',
-          vvOffsetTop:vv?fmt(vv.offsetTop):'n/a',
-          vvPageTop:vv?fmt(vv.pageTop):'n/a',
-          vvHeight:vv?fmt(vv.height):'n/a',
-          scrollY:fmt(window.scrollY),
-          innerH:window.innerHeight,
-          focused:document.activeElement===document.getElementById('q')?'INPUT':'-',
-        });
-        hits.length=Math.min(hits.length,8);
-      }
-      box.textContent =
-        'WORST barTop: '+fmt(worst)+'px   (negative = bar above screen)   frames:'+frames+'\n'+
-        'live: barTop='+fmt(top)+' styleTop='+(bar.style.top||'-')+
-        ' vvOffsetTop='+(vv?fmt(vv.offsetTop):'n/a')+' vvPageTop='+(vv?fmt(vv.pageTop):'n/a')+
-        ' scrollY='+fmt(window.scrollY)+'\n'+
-        '--- worst captures ---\n'+
-        hits.map(h=>JSON.stringify(h)).join('\n');
-      requestAnimationFrame(watch);
-    })();
-  }
-
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
 </script>
