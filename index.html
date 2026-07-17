@@ -590,8 +590,10 @@
     searchbarEl.style.top = t+'px';
   };
   let scrollAfterSettle=false;   // see the searchClose handler
+  // keyboard up = the layout is (or is about to be) in its shifted state
+  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
   if(vv){
-    const keyboardOpen = ()=> (window.innerHeight - vv.height) > 120;
+    const keyboardOpen = keyboardUp;
     let settleTimer=null;
     const onSettled = ()=>{
       settleTimer=null;
@@ -641,11 +643,12 @@
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
-    // If the bar is pinned, the blur is about to close the keyboard: the viewport height,
-    // the spacer, and the bar's position are all about to change. A scroll computed NOW
-    // targets a layout that's about to shift and lands offset (ended up lines above the
-    // bar). Defer it to onSettled so it runs against the final layout instead.
-    if(pinned) scrollAfterSettle=true;
+    // If the keyboard is up (pinned OR mid-transition sticky — e.g. X right after a
+    // down-and-up scroll, before the settle re-pinned), the blur is about to close it:
+    // viewport height, spacer and bar position all about to change. A scroll computed NOW
+    // targets a layout that's about to shift and lands offset (bar mid-screen / lines
+    // above). Defer it to onSettled so it runs against the final layout instead.
+    if(pinned || keyboardUp()) scrollAfterSettle=true;
     else scrollToResults();
   });
 
