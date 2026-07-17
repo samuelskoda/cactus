@@ -593,30 +593,55 @@
   // keyboard up = the layout is (or is about to be) in its shifted state
   const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
   if(vv){
-    const keyboardOpen = keyboardUp;
-    let settleTimer=null;
-    const onSettled = ()=>{
+    let settleTimer=null, armedScrollY=0;
+    function arm(){
+      clearTimeout(settleTimer);
+      armedScrollY = window.scrollY;
+      settleTimer = setTimeout(onSettled, 120);
+    }
+    function onSettled(){
       settleTimer=null;
+      // Deceleration fires scroll events sparsely, so 120ms of event silence can pass
+      // while the page is still creeping — pinning then, and unpinning on the next event,
+      // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
+      // has actually held, not merely the events.
+      if(Math.abs(window.scrollY - armedScrollY) > 1){ arm(); return; }
       // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
-      if(keyboardOpen()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      if(keyboardUp()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
-    };
-    const onChange = ()=>{
-      // viewport is moving (keyboard sliding, or a pan): ride the content as a sticky
-      // element — native, no lag — and re-decide once it stops.
-      goSticky();
-      clearTimeout(settleTimer);
-      settleTimer = setTimeout(onSettled, 120);
-    };
+    }
+    function onChange(){
+      if(pinned && !keyboardUp()){
+        // Keyboard closing while pinned (e.g. after X): keep the bar at the visible top by
+        // following offsetTop per event. Going sticky here re-anchored the bar offsetTop px
+        // ABOVE the visible area — it vanished upward and slid back down, the "jump" after
+        // X. offsetTop ends at 0, so the eventual fixed->sticky handoff is seamless.
+        searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop))+'px';
+      } else {
+        // viewport in motion (keyboard sliding, or a pan): ride the content as a sticky
+        // element — native, no lag — and re-decide once it stops.
+        goSticky();
+      }
+      arm();
+    }
     vv.addEventListener('resize', onChange);
     vv.addEventListener('scroll', onChange);
+    const maxScrollY = ()=> document.documentElement.scrollHeight - window.innerHeight;
     // Ordinary page scrolling fires neither vv event, so without this the settle timer
     // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
-    // it — a pin/unpin flicker exactly as scrolling slows. Any page scroll while the bar
-    // is pinned or a settle is pending counts as motion and pushes the pin back.
-    window.addEventListener('scroll', ()=>{ if(pinned || settleTimer) onChange(); }, {passive:true});
+    // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
+    window.addEventListener('scroll', ()=>{
+      if(!keyboardUp() && window.scrollY > maxScrollY()+1){
+        // Bottom rubber-band: iOS detaches sticky during the bounce (the bar slid away
+        // with the content even with no keyboard involved). A fixed element doesn't
+        // bounce, and fixed;top:0 is the exact visual spot the stuck bar occupies, so the
+        // pin is invisible — it just holds the bar still until the bounce settles.
+        pinFixed(0);
+        arm();
+      } else if(pinned || settleTimer) onChange();
+    }, {passive:true});
   }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
