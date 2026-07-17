@@ -270,11 +270,10 @@
   }
 
   document.getElementById('q').addEventListener('input', e=>{
-    const hadText = state.q.length>0;
     state.q=e.target.value.toLowerCase().trim();
     document.getElementById('searchBox').classList.toggle('hastext', e.target.value.length>0);
     render();
-    if(!hadText && state.q.length>0) scrollToResults();   // first keystroke: bring results into view
+    scrollToResults();   // on every keystroke, added or removed (no-op if already there)
   });
 
   // ---- render grid
@@ -482,12 +481,21 @@
   const searchbarSpacer = document.getElementById('searchbarSpacer');
   const vv = window.visualViewport;
 
+  // Document Y where the spacer (the bar's old flow slot) begins. While pinned we
+  // clamp the bar here so it never floats above its resting place under the stats.
+  let barAnchorTop = 0;
+
   // Write the position synchronously (no rAF): the bar must land in the same frame
   // the browser paints the scroll, otherwise it visibly lags a frame behind and
   // stutters when scrolling fast. Skipping redundant writes keeps this cheap.
   function pinBarToVisibleTop(){
     if(!searchbarEl.classList.contains('kbd-fixed')) return;
-    const y = vv ? vv.offsetTop : 0;
+    const vTop = vv ? vv.offsetTop : 0;         // top of the visible area (keyboard pans this)
+    // How far the bar's anchor sits below the current visible top. Positive means
+    // we've scrolled up past the anchor — the bar must ride down with the page so
+    // it stays below the stats instead of clinging to the top.
+    const belowTop = Math.max(0, barAnchorTop - window.scrollY);
+    const y = vTop + belowTop;
     const next = y ? `translateY(${y}px)` : '';
     if(searchbarEl.style.transform !== next) searchbarEl.style.transform = next;
   }
@@ -495,6 +503,7 @@
     vv.addEventListener('scroll', pinBarToVisibleTop);
     vv.addEventListener('resize', pinBarToVisibleTop);
   }
+  window.addEventListener('scroll', pinBarToVisibleTop, {passive:true});
 
   function unpinBar(){
     searchbarEl.classList.remove('kbd-fixed');
@@ -511,6 +520,8 @@
     // everything below up by that much (the 12px bump on focus).
     const cs = getComputedStyle(searchbarEl);
     const footprint = searchbarEl.getBoundingClientRect().height + (parseFloat(cs.marginBottom) || 0);
+    // remember where the bar's flow slot lives in the document
+    barAnchorTop = searchbarSpacer.getBoundingClientRect().top + window.scrollY;
     searchbarSpacer.style.height = footprint + 'px';
     searchbarEl.classList.add('kbd-fixed');
     pinBarToVisibleTop();
