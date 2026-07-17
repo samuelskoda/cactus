@@ -613,16 +613,16 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      if(pinned && !keyboardUp()){
-        // Keyboard closing while pinned (e.g. after X): keep the bar at the visible top by
-        // following offsetTop per event. Going sticky here re-anchored the bar offsetTop px
-        // ABOVE the visible area — it vanished upward and slid back down, the "jump" after
-        // X. offsetTop ends at 0, so the eventual fixed->sticky handoff is seamless.
-        searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop))+'px';
-      } else {
-        // viewport in motion (keyboard sliding, or a pan): ride the content as a sticky
-        // element — native, no lag — and re-decide once it stops.
-        goSticky();
+      if(pinned){
+        // Keyboard closing (scroll-dismiss) or panning: follow the visible top by setting
+        // top:=offsetTop, and hand back to sticky ONLY once the keyboard is fully closed and
+        // the pan has settled to 0. Unpinning while offsetTop is still > 0 (keyboard only
+        // part-way closed) dropped the bar to its misplaced sticky spot for a frame — that
+        // was the flicker while slowly scrolling. At offsetTop 0 the fixed(top:0)->sticky
+        // (top:0) handoff is seamless.
+        const off = Math.max(0, Math.round(vv.offsetTop));
+        if(off === 0 && !keyboardUp()) goSticky();
+        else searchbarEl.style.top = off + 'px';
       }
       arm();
     }
