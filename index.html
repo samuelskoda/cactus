@@ -22,9 +22,18 @@
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35); }
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth;overflow-anchor:none}
+  html{overflow-anchor:none}
+  /* The page content scrolls inside #scroller, NOT the document. On iOS the ROOT scroller
+     scrolls on the compositor thread and, while the keyboard is open, drifts fixed AND
+     sticky elements (the search bar "floated" during scroll). An inner overflow:auto
+     container is a normal element scroll without that bug, so position:sticky on the bar
+     holds its top solidly. body fills the screen and doesn't scroll itself. */
+  html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  #scroller{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    scroll-behavior:smooth;overflow-anchor:none;position:relative}
   a{color:var(--accent)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
@@ -36,17 +45,11 @@
   .stat b{display:block;font-size:1.5rem;color:var(--accent);line-height:1}
   .stat span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
-  /* Sticky bar: a search field + a separate Filters button */
+  /* Sticky bar: a search field + a separate Filters button. Sticky within #scroller (an
+     inner scroll container), which is reliable on iOS even with the keyboard open — unlike
+     sticky on the root scroller, which iOS breaks. No JS pinning needed anymore. */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* While the keyboard is open, iOS Safari breaks position:sticky — the bar stops sticking
-     and scrolls off with the page (measured: barTop -1322 at scrollY 1622, offsetTop 0,
-     visualViewport height 362 vs layout 739). position:fixed does NOT have this bug, and
-     because the viewport isn't panned (offsetTop 0) fixed;top:0 lands exactly at the screen
-     top. We only pin while the keyboard is engaged — by then focus has already scrolled the
-     bar to the top and the header is off-screen, so fixed;top:0 doesn't cover anything. The
-     #scrollAnchor above reserves the bar's flow height meanwhile so nothing jumps. */
-  .searchbar.pinned{position:fixed;top:0;left:0;right:0;margin-bottom:0}
   /* Frosted glass on a dedicated child layer rather than on the bar itself: a blur on the
      sticky bar went stale after the keyboard resized the visual viewport and flickered on
      every later scroll; this div isn't sticky, which is what fixed that.
@@ -199,6 +202,7 @@
 </style>
 </head>
 <body>
+<div id="scroller">
 <header class="hero">
   <div class="wrap">
     <h1>🌵 My Cactus Collection</h1>
@@ -240,14 +244,16 @@
   <div class="grid" id="grid"></div>
 </main>
 
-<div class="modal" id="modal" role="dialog" aria-modal="true">
-  <div class="sheet" id="sheet"></div>
-</div>
-
 <footer class="wrap">
   Identifications are best-effort and not authoritative — some are uncertain and may be wrong.
 </footer>
 <div id="scrollPad" style="height:0"></div>
+</div><!-- /#scroller -->
+
+<!-- modal lives OUTSIDE #scroller: it's a fixed full-screen overlay, must not scroll with content -->
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="sheet" id="sheet"></div>
+</div>
 
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
@@ -380,6 +386,7 @@
     clearTimeout(trimPadTimer);
     trimPadTimer = setTimeout(trimPadToMinimal, 500);
   }
+  const scroller = document.getElementById('scroller');   // the inner scroll container
   // grow the bottom spacer so there's always enough page to scroll the search
   // bar to the top, even when a filter leaves just one row of results
   function growPadForWorstCase(){
@@ -387,9 +394,9 @@
     if(!pad) return;
     const currentPad = pad.offsetHeight;
     const gridHeight = grid.offsetHeight;
-    const otherHeight = (document.documentElement.scrollHeight - currentPad) - gridHeight;
+    const otherHeight = (scroller.scrollHeight - currentPad) - gridHeight;
     // assume the grid could shrink all the way to nothing — a safe upper bound
-    const worstCaseNeeded = window.scrollY + window.innerHeight - otherHeight;
+    const worstCaseNeeded = scroller.scrollTop + scroller.clientHeight - otherHeight;
     if(worstCaseNeeded > currentPad) pad.style.height = worstCaseNeeded + 'px';
   }
   let trimPadTimer=null;
@@ -397,8 +404,8 @@
     const pad=document.getElementById('scrollPad'), anchor=document.getElementById('scrollAnchor');
     if(!pad || !anchor) return;
     const currentPad = pad.offsetHeight;
-    const contentHeight = document.documentElement.scrollHeight - currentPad;
-    const minimal = Math.max(0, anchor.offsetTop + window.innerHeight - contentHeight);
+    const contentHeight = scroller.scrollHeight - currentPad;
+    const minimal = Math.max(0, anchor.offsetTop + scroller.clientHeight - contentHeight);
     if(minimal !== currentPad) pad.style.height = minimal + 'px';
   }
 
@@ -443,16 +450,14 @@
   }
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
-  // scroll so the sticky search bar sits at the top with the first result just below it
+  // scroll #scroller so the sticky search bar sits at the top with the first result below it
   function scrollToResults(){
     const anchor=document.getElementById('scrollAnchor');
     if(!anchor) return;
-    // offsetTop on the sticky search bar itself is unreliable once it's "stuck"
-    // in some browsers, so target a plain (non-sticky) marker just above it and
-    // compute its position fresh each time via getBoundingClientRect + scrollY.
+    // target = current scrollTop plus the anchor's offset from the scroller's own top edge
     const doScroll=()=>{
-      const target = window.scrollY + anchor.getBoundingClientRect().top;
-      window.scrollTo({top: Math.max(0, target), behavior:'smooth'});
+      const target = scroller.scrollTop + anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      scroller.scrollTo({top: Math.max(0, target), behavior:'smooth'});
     };
     doScroll();
     requestAnimationFrame(doScroll);
@@ -555,103 +560,10 @@
   // animations and caused most of the transition glitches. The keyboard now closes only
   // via its Search key, the field's ×, or tapping outside the input.
 
-  // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
-  // rubber — the content slides on the compositor and JS always follows a frame late).
-  // Instead: while the visual viewport is MOVING, leave the bar sticky so it rides the
-  // content natively (no JS, no lag — "moves with content"). Only once the viewport has
-  // SETTLED do we pin it once to fixed;top:=offsetTop, the correct resting spot. No rAF,
-  // no continuous sync. Every transition is a single reposition, never a chase.
-  const searchbarEl = document.querySelector('.searchbar');
-  const scrollAnchorEl = document.getElementById('scrollAnchor');
-  const vv = window.visualViewport;
-  let pinned=false;
-  const goSticky = ()=>{
-    if(!pinned) return;
-    pinned=false;
-    searchbarEl.classList.remove('pinned');
-    searchbarEl.style.top = '';           // back to the CSS sticky top:0
-    scrollAnchorEl.style.height = '0';
-  };
-  // keyboard up = the layout is (or is about to be) in its shifted state
-  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
-  // Anti-float loop: while the bar is pinned under the keyboard, iOS lets the fixed layer
-  // drift with the content mid-scroll (the "floats around"). Merely READING the bar's rect
-  // each frame forces the compositor to re-sync the layer to its CSS position — the same
-  // side effect that made the debug overlay keep the bar anchored. It only reads, never
-  // repositions, so it can't reintroduce the rubber (that came from per-frame top changes).
-  let anchorRaf = 0;
-  const anchorLoop = ()=>{
-    if(!(pinned && keyboardUp())){ anchorRaf = 0; return; }
-    void searchbarEl.getBoundingClientRect().top;   // force per-frame compositor re-sync
-    anchorRaf = requestAnimationFrame(anchorLoop);
-  };
-  const pinFixed = (t)=>{
-    if(!pinned){
-      pinned=true;
-      scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
-      searchbarEl.classList.add('pinned');
-    }
-    searchbarEl.style.top = t+'px';
-    if(keyboardUp() && !anchorRaf) anchorRaf = requestAnimationFrame(anchorLoop);
-  };
-  let scrollAfterSettle=false;   // see the searchClose handler
-  if(vv){
-    let settleTimer=null, armedScrollY=0;
-    function arm(){
-      clearTimeout(settleTimer);
-      armedScrollY = window.scrollY;
-      settleTimer = setTimeout(onSettled, 120);
-    }
-    function onSettled(){
-      settleTimer=null;
-      // Deceleration fires scroll events sparsely, so 120ms of event silence can pass
-      // while the page is still creeping — pinning then, and unpinning on the next event,
-      // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
-      // has actually held, not merely the events.
-      if(Math.abs(window.scrollY - armedScrollY) > 1){ arm(); return; }
-      // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
-      if(keyboardUp()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
-      else goSticky();
-      // a scroll-to-results requested mid-transition runs now, against the FINAL layout
-      if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
-    }
-    function onChange(){
-      if(pinned && keyboardUp()){
-        // Pinned with the keyboard up: STAY pinned through page scrolling. Now that
-        // scrolling doesn't dismiss the keyboard, riding as sticky here meant the bar
-        // scrolled away with the content for as long as the keyboard was open — "not
-        // anchored". A fixed bar holds the visible top through real scrolling (measured:
-        // only a hard fling detaches it briefly, and it snaps back on its own); a
-        // viewport PAN drifts it, and the settle re-squares top:=offsetTop in one step.
-        arm(); return;
-      }
-      if(pinned && !keyboardUp()){
-        // Keyboard closing while pinned (e.g. after X): keep the bar at the visible top by
-        // following offsetTop per event. Going sticky here re-anchored the bar offsetTop px
-        // ABOVE the visible area — it vanished upward and slid back down, the "jump" after
-        // X. offsetTop ends at 0, so the eventual fixed->sticky handoff is seamless.
-        searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop))+'px';
-      } else {
-        // viewport in motion (keyboard sliding, or a pan): ride the content as a sticky
-        // element — native, no lag — and re-decide once it stops.
-        goSticky();
-      }
-      arm();
-    }
-    vv.addEventListener('resize', onChange);
-    vv.addEventListener('scroll', onChange);
-    // Ordinary page scrolling fires neither vv event, so without this the settle timer
-    // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
-    // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
-    // NOTE: no special-casing of the bottom rubber-band here. An earlier pinFixed(0)
-    // branch tried to hold the bar through the bounce and instead hung it above the
-    // visible area (in overscroll the visual viewport pans beyond the layout viewport, so
-    // fixed;top:0 is off-screen). Native sticky handles the bounce correctly on its own —
-    // the state that worked — so with no keyboard involved the JS stays hands-off.
-    window.addEventListener('scroll', ()=>{
-      if(pinned || settleTimer) onChange();
-    }, {passive:true});
-  }
+  // No JS pinning any more. The bar is position:sticky inside #scroller (an inner scroll
+  // container), which iOS handles reliably even with the keyboard open — the whole reason
+  // for the switch away from the root scroller. Scrolling no longer dismisses the keyboard;
+  // it closes only via the Search key, the field's ×, or tapping outside the input.
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
@@ -677,13 +589,7 @@
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
-    // If the keyboard is up (pinned OR mid-transition sticky — e.g. X right after a
-    // down-and-up scroll, before the settle re-pinned), the blur is about to close it:
-    // viewport height, spacer and bar position all about to change. A scroll computed NOW
-    // targets a layout that's about to shift and lands offset (bar mid-screen / lines
-    // above). Defer it to onSettled so it runs against the final layout instead.
-    if(pinned || keyboardUp()) scrollAfterSettle=true;
-    else scrollToResults();
+    scrollToResults();
   });
 
   // loading="lazy" keeps the first paint cheap, but it also means a card sitting far
@@ -739,12 +645,11 @@
       if(top < worst-0.5){                          // NEW worst only → rare repaint
         worst=top;
         hits.unshift({
-          barTop:Math.round(top),
-          pos: getComputedStyle(bar).position,        // sticky = pin didn't engage; fixed = fixed also broke
-          pinned: bar.classList.contains('pinned')?'Y':'-',
-          offsetTop: vv?Math.round(vv.offsetTop):'n/a',
+          barTop:Math.round(top),                     // want ~0 (bar anchored at scroller top)
+          pos: getComputedStyle(bar).position,
+          offsetTop: vv?Math.round(vv.offsetTop):'n/a',  // keyboard viewport pan (0 = no pan)
           vvHeight: vv?Math.round(vv.height):'n/a',
-          scrollY:Math.round(window.scrollY),
+          scrollTop:Math.round(document.getElementById('scroller').scrollTop),
           innerH:window.innerHeight,
           focused: document.activeElement===document.getElementById('q')?'Y':'-',
         });
