@@ -513,6 +513,39 @@
   document.addEventListener('touchmove', e=>{
     if(document.activeElement === searchInput && !searchRowEl.contains(e.target)) searchInput.blur();
   }, {passive:true});
+
+  // iOS drops the blurred bar's backdrop snapshot when the keyboard resizes the visual
+  // viewport, then re-reads it every frame while scrolling — that's the flicker, and why
+  // it only ever started after the keyboard had been opened and closed. The layer stays
+  // stale until something forces it to rebuild, which is exactly what selecting a filter
+  // or tapping away was doing by hand. So do it deliberately once the viewport settles:
+  // drop the blur, let one frame paint without it, then put it back. The blip lands while
+  // the keyboard is still animating, so it isn't visible.
+  const barEl = document.querySelector('.searchbar');
+  function rebuildBarBlur(){
+    barEl.style.setProperty('-webkit-backdrop-filter','none');
+    barEl.style.setProperty('backdrop-filter','none');
+    void barEl.offsetHeight;                       // force layout, don't let the two writes coalesce
+    let restored=false;
+    const restore=()=>{
+      if(restored) return;
+      restored=true;
+      barEl.style.removeProperty('-webkit-backdrop-filter');
+      barEl.style.removeProperty('backdrop-filter');
+    };
+    // rAF gives the clean one-frame gap, but it's paused in background tabs — and a
+    // missed restore would strip the glass for good. The timeout guarantees it comes
+    // back either way; whichever fires first wins.
+    requestAnimationFrame(restore);
+    setTimeout(restore, 100);
+  }
+  if(window.visualViewport){
+    let vvTimer=null;
+    window.visualViewport.addEventListener('resize', ()=>{   // fires on keyboard open and close
+      clearTimeout(vvTimer);
+      vvTimer=setTimeout(rebuildBarBlur, 250);               // wait out the keyboard animation
+    });
+  }
   // Tapping the field scrolls the bar to the top, same as typing does. Besides being
   // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
   // exists only to lift the focused input clear of the keyboard, so if we've already
