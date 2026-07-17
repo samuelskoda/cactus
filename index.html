@@ -550,19 +550,10 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Mobile keyboard vs the sticky bar: while the keyboard is open, iOS pans the
-  // visual viewport and sticky (layout-viewport-anchored) drifts. Chasing it with
-  // JS transforms stutters — iOS scrolls on the compositor thread, so JS always
-  // lands a frame late. Instead: the moment a scroll gesture starts, dismiss the
-  // keyboard. Scrolling then only ever happens with the keyboard closed, where
-  // sticky is natively smooth. (touchmove = a real finger drag; programmatic
-  // scrolls like scrollToResults() don't fire it, so typing keeps the keyboard.)
-  const searchRowEl = document.getElementById('searchRow');
-  document.addEventListener('touchmove', e=>{
-    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
-      searchInput.blur();   // the blur event also suspends the glass; see below
-    }
-  }, {passive:true});
+  // Scrolling deliberately does NOT dismiss the keyboard (an earlier touchmove-blur
+  // handler did; removed by request). Closing the keyboard mid-scroll mixed two viewport
+  // animations and caused most of the transition glitches. The keyboard now closes only
+  // via its Search key, the field's ×, or tapping outside the input.
 
   // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
   // rubber — the content slides on the compositor and JS always follows a frame late).
@@ -628,19 +619,16 @@
     }
     vv.addEventListener('resize', onChange);
     vv.addEventListener('scroll', onChange);
-    const maxScrollY = ()=> document.documentElement.scrollHeight - window.innerHeight;
     // Ordinary page scrolling fires neither vv event, so without this the settle timer
     // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
     // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
+    // NOTE: no special-casing of the bottom rubber-band here. An earlier pinFixed(0)
+    // branch tried to hold the bar through the bounce and instead hung it above the
+    // visible area (in overscroll the visual viewport pans beyond the layout viewport, so
+    // fixed;top:0 is off-screen). Native sticky handles the bounce correctly on its own —
+    // the state that worked — so with no keyboard involved the JS stays hands-off.
     window.addEventListener('scroll', ()=>{
-      if(!keyboardUp() && window.scrollY > maxScrollY()+1){
-        // Bottom rubber-band: iOS detaches sticky during the bounce (the bar slid away
-        // with the content even with no keyboard involved). A fixed element doesn't
-        // bounce, and fixed;top:0 is the exact visual spot the stuck bar occupies, so the
-        // pin is invisible — it just holds the bar still until the bounce settles.
-        pinFixed(0);
-        arm();
-      } else if(pinned || settleTimer) onChange();
+      if(pinned || settleTimer) onChange();
     }, {passive:true});
   }
 
