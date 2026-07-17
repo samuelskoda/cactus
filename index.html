@@ -556,6 +556,31 @@
     }
   }, {passive:true});
 
+  // Stick to the VISUAL viewport, not the layout one.
+  // position:sticky;top:0 anchors to the layout viewport. When the keyboard opens, iOS
+  // doesn't scroll the document to reveal the input — it pans the visual viewport inside
+  // the layout viewport, so visualViewport.offsetTop goes positive and the layout
+  // viewport's top ends up above the screen. The bar then sticks faithfully to a point
+  // offsetTop px too high: half of it above the display, or all of it (which reads as the
+  // bar "disappearing"). That's the flicker — a misplacement, not a paint bug. It needs
+  // the keyboard because offsetTop is otherwise always 0, which is exactly why an
+  // unactivated bar never misbehaves.
+  // Matching top: to offsetTop puts it back on screen. This is NOT the old transform-
+  // chasing that stuttered: offsetTop only changes when the viewport actually pans
+  // (keyboard, pinch-zoom) — ordinary scrolling doesn't fire these events at all, so
+  // nothing runs per-frame while you scroll.
+  const vv = window.visualViewport;
+  if(vv){
+    const searchbarEl = document.querySelector('.searchbar');
+    const stickToVisualViewport = ()=>{
+      const t = Math.max(0, Math.round(vv.offsetTop));
+      if(searchbarEl.style.top !== t+'px') searchbarEl.style.top = t+'px';
+    };
+    vv.addEventListener('resize', stickToVisualViewport);
+    vv.addEventListener('scroll', stickToVisualViewport);
+    stickToVisualViewport();
+  }
+
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
   // bar carries no background of its own — it must stay transparent for the blur to sample
