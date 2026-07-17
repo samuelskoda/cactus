@@ -600,11 +600,17 @@
   };
   if(vv){
     // Keyboard open when the visual viewport is meaningfully shorter than the layout one.
-    // This fires on keyboard show/hide (before you can scroll), and never on desktop — where
-    // focus opens no keyboard, so the bar stays sticky and never covers the header.
+    // Fires on keyboard show/hide (before you can scroll), never on desktop (no keyboard).
     const keyboardOpen = ()=> (window.innerHeight - vv.height) > 120;
-    vv.addEventListener('resize', ()=>{ keyboardOpen() ? pin() : unpin(); });
-    vv.addEventListener('scroll', ()=>{ if(pinned && !syncRaf) syncRaf=requestAnimationFrame(syncTop); });
+    const updatePinState = ()=>{
+      if(keyboardOpen()) pin();
+      // Unpin only once the pan has ALSO settled to 0. The height recovers a beat before
+      // offsetTop does; unpinning on height alone hands off fixed(top:offsetTop) -> sticky
+      // (top:0) while offsetTop is still non-zero, jerking the bar up above its rest spot.
+      else if(Math.round(vv.offsetTop)===0) unpin();
+    };
+    vv.addEventListener('resize', updatePinState);
+    vv.addEventListener('scroll', updatePinState);   // syncTop self-sustains via rAF while pinned
   }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
