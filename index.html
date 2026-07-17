@@ -37,15 +37,20 @@
   .stat span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
   /* Sticky bar: a search field + a separate Filters button */
-  /* Frosted glass. The -webkit- prefix is required: Safari only supports the
-     unprefixed property from 18. Not force-promoted with translateZ(0) — a
-     permanently composited layer made the iOS flicker worse, not better. */
-  .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
-    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
+  /* Frosted glass, on a dedicated child layer rather than the bar itself: iOS's
+     keyboard resize leaves the blur's backdrop snapshot stale, and no amount of
+     style-toggling on a live element reliably rebuilds it. A childless, listener-
+     free div CAN simply be swapped for a fresh clone (see JS) — a new node can't
+     have a stale snapshot. -webkit- prefix required below Safari 18. */
+  .searchbar .glass{position:absolute;inset:0;z-index:-1;
+    background:color-mix(in srgb,var(--bg) 88%, transparent);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
   /* No blur support -> opaque bar, so content can't show through while it's stuck. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
     .searchbar{background:var(--bg)}
+    .searchbar .glass{display:none}
   }
   .searchrow{position:relative;display:flex;gap:8px;align-items:center;justify-content:center}
   .search{position:relative;flex:0 1 260px;min-width:0}
@@ -187,6 +192,7 @@
 
 <div id="scrollAnchor" style="height:0"></div>
 <div class="searchbar">
+  <div class="glass" aria-hidden="true"></div>
   <div class="wrap">
     <div class="searchrow" id="searchRow">
       <div class="search" id="searchBox">
@@ -508,33 +514,33 @@
   document.addEventListener('touchmove', e=>{
     if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
       searchInput.blur();
-      scheduleOutsideTap();   // scroll-dismissal leaves the blur flickering; see below
+      scheduleGlassRefresh();   // scroll-dismissal leaves the blur flickering; see below
     }
   }, {passive:true});
 
-  // Dismissing the keyboard by scrolling leaves the sticky bar's blur flickering, while
-  // tapping outside clears it. So replay that tap ourselves, once the scroll has settled
-  // (any scroll re-arms the timer) — a tap fired mid-scroll wouldn't land on a still page.
-  // Caveat: the outside-click handler only calls closePanel(), which does nothing when the
-  // panel is already shut, so if the cure is really iOS re-compositing on a physical touch
-  // rather than anything in our JS, a synthetic event can't reproduce it.
-  function tapOutside(){
-    const t=document.body;
-    const o={bubbles:true, cancelable:true, view:window, clientX:2, clientY:2};
-    t.dispatchEvent(new PointerEvent('pointerdown',o));
-    t.dispatchEvent(new MouseEvent('mousedown',o));
-    t.dispatchEvent(new PointerEvent('pointerup',o));
-    t.dispatchEvent(new MouseEvent('mouseup',o));
-    t.dispatchEvent(new MouseEvent('click',o));   // target is body, so no card onclick fires
+  // The keyboard's viewport resize leaves the glass layer's backdrop snapshot stale, and
+  // iOS then re-reads it every frame while scrolling — the flicker. Style toggles and
+  // synthetic events on the live element never rebuilt it (the repair happens in the
+  // compositor, which JS events can't reach). So destroy the element instead: swap the
+  // glass div for a fresh clone. A brand-new node can't have a stale snapshot — iOS must
+  // build its backdrop layer from scratch. The div is childless and has no listeners, so
+  // the swap loses nothing. Deferred until scrolling settles (any scroll re-arms the
+  // timer): a swap mid-scroll could itself land stale, which sank an earlier attempt.
+  function refreshGlass(){
+    const old=document.querySelector('.searchbar .glass');
+    if(old) old.replaceWith(old.cloneNode(false));
   }
-  let tapTimer=null, tapPending=false;
-  function scheduleOutsideTap(){
-    tapPending=true;
-    clearTimeout(tapTimer);
-    tapTimer=setTimeout(()=>{ tapPending=false; tapOutside(); }, 250);
+  let glassTimer=null, glassPending=false;
+  function scheduleGlassRefresh(){
+    glassPending=true;
+    clearTimeout(glassTimer);
+    glassTimer=setTimeout(()=>{ glassPending=false; refreshGlass(); }, 250);
   }
-  // only postpones a tap that's already due — normal scrolling never triggers one
-  window.addEventListener('scroll', ()=>{ if(tapPending) scheduleOutsideTap(); }, {passive:true});
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', scheduleGlassRefresh);  // keyboard open/close
+  }
+  // only postpones a refresh that's already due — normal scrolling never triggers one
+  window.addEventListener('scroll', ()=>{ if(glassPending) scheduleGlassRefresh(); }, {passive:true});
 
   // Tapping the field scrolls the bar to the top, same as typing does. Besides being
   // consistent, this aims to pre-empt iOS's own scroll-into-view: that native nudge
