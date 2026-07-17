@@ -22,34 +22,9 @@
       --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35); }
   }
   *{box-sizing:border-box}
-  html{overflow-anchor:none}
-  /* The page content scrolls inside #scroller, NOT the document. On iOS the ROOT scroller
-     scrolls on the compositor thread and, while the keyboard is open, drifts fixed AND
-     sticky elements (the search bar "floated" during scroll). An inner overflow:auto
-     container is a normal element scroll without that bug, so position:sticky on the bar
-     holds its top solidly. body fills the screen and doesn't scroll itself. */
-  html,body{height:100%}
+  html{scroll-behavior:smooth;overflow-anchor:none}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-  #scroller{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
-    scroll-behavior:smooth;overflow-anchor:none;position:relative}
-  /* Custom pull-to-refresh — the inner scroller has no native one. This sits just above
-     the content; the top overscroll bounce reveals it, and JS turns a far-enough pull into
-     a reload. */
-  #ptr{position:absolute;top:-46px;left:0;right:0;height:46px;display:flex;align-items:center;
-    justify-content:center;gap:8px;color:var(--muted);font-size:.85rem}
-  #ptr.ready{color:var(--accent);font-weight:600}
-  #ptrSpin{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);
-    border-top-color:var(--accent);flex:0 0 auto}
-  #ptr.spin #ptrSpin{animation:ptrspin .7s linear infinite}
-  @keyframes ptrspin{to{transform:rotate(360deg)}}
-  /* scroll-to-top button (substitute for the iOS status-bar tap; see markup) */
-  #toTop{position:fixed;right:16px;bottom:16px;width:46px;height:46px;border-radius:50%;
-    border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:1.4rem;
-    line-height:1;box-shadow:var(--shadow);cursor:pointer;z-index:40;
-    opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;pointer-events:none}
-  #toTop.show{opacity:1;transform:none;pointer-events:auto}
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   a{color:var(--accent)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
@@ -61,11 +36,17 @@
   .stat b{display:block;font-size:1.5rem;color:var(--accent);line-height:1}
   .stat span{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 
-  /* Sticky bar: a search field + a separate Filters button. Sticky within #scroller (an
-     inner scroll container), which is reliable on iOS even with the keyboard open — unlike
-     sticky on the root scroller, which iOS breaks. No JS pinning needed anymore. */
+  /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
+  /* While the keyboard is open, iOS Safari breaks position:sticky — the bar stops sticking
+     and scrolls off with the page (measured: barTop -1322 at scrollY 1622, offsetTop 0,
+     visualViewport height 362 vs layout 739). position:fixed does NOT have this bug, and
+     because the viewport isn't panned (offsetTop 0) fixed;top:0 lands exactly at the screen
+     top. We only pin while the keyboard is engaged — by then focus has already scrolled the
+     bar to the top and the header is off-screen, so fixed;top:0 doesn't cover anything. The
+     #scrollAnchor above reserves the bar's flow height meanwhile so nothing jumps. */
+  .searchbar.pinned{position:fixed;top:0;left:0;right:0;margin-bottom:0}
   /* Frosted glass on a dedicated child layer rather than on the bar itself: a blur on the
      sticky bar went stale after the keyboard resized the visual viewport and flickered on
      every later scroll; this div isn't sticky, which is what fixed that.
@@ -218,8 +199,6 @@
 </style>
 </head>
 <body>
-<div id="scroller">
-<div id="ptr" aria-hidden="true"><span id="ptrSpin"></span><span id="ptrText">Pull to refresh</span></div>
 <header class="hero">
   <div class="wrap">
     <h1>🌵 My Cactus Collection</h1>
@@ -261,21 +240,14 @@
   <div class="grid" id="grid"></div>
 </main>
 
-<footer class="wrap">
-  Identifications are best-effort and not authoritative — some are uncertain and may be wrong.
-</footer>
-<div id="scrollPad" style="height:0"></div>
-</div><!-- /#scroller -->
-
-<!-- modal lives OUTSIDE #scroller: it's a fixed full-screen overlay, must not scroll with content -->
 <div class="modal" id="modal" role="dialog" aria-modal="true">
   <div class="sheet" id="sheet"></div>
 </div>
 
-<!-- scroll-to-top: iOS routes its status-bar tap to the root scroller, which we no longer
-     use, so that gesture can't reach #scroller and can't be hooked from JS. This button is
-     the reliable substitute — appears once you've scrolled down. -->
-<button id="toTop" type="button" aria-label="Scroll to top">↑</button>
+<footer class="wrap">
+  Identifications are best-effort and not authoritative — some are uncertain and may be wrong.
+</footer>
+<div id="scrollPad" style="height:0"></div>
 
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
@@ -408,7 +380,6 @@
     clearTimeout(trimPadTimer);
     trimPadTimer = setTimeout(trimPadToMinimal, 500);
   }
-  const scroller = document.getElementById('scroller');   // the inner scroll container
   // grow the bottom spacer so there's always enough page to scroll the search
   // bar to the top, even when a filter leaves just one row of results
   function growPadForWorstCase(){
@@ -416,9 +387,9 @@
     if(!pad) return;
     const currentPad = pad.offsetHeight;
     const gridHeight = grid.offsetHeight;
-    const otherHeight = (scroller.scrollHeight - currentPad) - gridHeight;
+    const otherHeight = (document.documentElement.scrollHeight - currentPad) - gridHeight;
     // assume the grid could shrink all the way to nothing — a safe upper bound
-    const worstCaseNeeded = scroller.scrollTop + scroller.clientHeight - otherHeight;
+    const worstCaseNeeded = window.scrollY + window.innerHeight - otherHeight;
     if(worstCaseNeeded > currentPad) pad.style.height = worstCaseNeeded + 'px';
   }
   let trimPadTimer=null;
@@ -426,8 +397,8 @@
     const pad=document.getElementById('scrollPad'), anchor=document.getElementById('scrollAnchor');
     if(!pad || !anchor) return;
     const currentPad = pad.offsetHeight;
-    const contentHeight = scroller.scrollHeight - currentPad;
-    const minimal = Math.max(0, anchor.offsetTop + scroller.clientHeight - contentHeight);
+    const contentHeight = document.documentElement.scrollHeight - currentPad;
+    const minimal = Math.max(0, anchor.offsetTop + window.innerHeight - contentHeight);
     if(minimal !== currentPad) pad.style.height = minimal + 'px';
   }
 
@@ -472,14 +443,16 @@
   }
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
-  // scroll #scroller so the sticky search bar sits at the top with the first result below it
+  // scroll so the sticky search bar sits at the top with the first result just below it
   function scrollToResults(){
     const anchor=document.getElementById('scrollAnchor');
     if(!anchor) return;
-    // target = current scrollTop plus the anchor's offset from the scroller's own top edge
+    // offsetTop on the sticky search bar itself is unreliable once it's "stuck"
+    // in some browsers, so target a plain (non-sticky) marker just above it and
+    // compute its position fresh each time via getBoundingClientRect + scrollY.
     const doScroll=()=>{
-      const target = scroller.scrollTop + anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-      scroller.scrollTo({top: Math.max(0, target), behavior:'smooth'});
+      const target = window.scrollY + anchor.getBoundingClientRect().top;
+      window.scrollTo({top: Math.max(0, target), behavior:'smooth'});
     };
     doScroll();
     requestAnimationFrame(doScroll);
@@ -577,15 +550,99 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Scrolling deliberately does NOT dismiss the keyboard (an earlier touchmove-blur
-  // handler did; removed by request). Closing the keyboard mid-scroll mixed two viewport
-  // animations and caused most of the transition glitches. The keyboard now closes only
-  // via its Search key, the field's ×, or tapping outside the input.
+  // Mobile keyboard vs the sticky bar: while the keyboard is open, iOS pans the
+  // visual viewport and sticky (layout-viewport-anchored) drifts. Chasing it with
+  // JS transforms stutters — iOS scrolls on the compositor thread, so JS always
+  // lands a frame late. Instead: the moment a scroll gesture starts, dismiss the
+  // keyboard. Scrolling then only ever happens with the keyboard closed, where
+  // sticky is natively smooth. (touchmove = a real finger drag; programmatic
+  // scrolls like scrollToResults() don't fire it, so typing keeps the keyboard.)
+  const searchRowEl = document.getElementById('searchRow');
+  document.addEventListener('touchmove', e=>{
+    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
+      searchInput.blur();   // the blur event also suspends the glass; see below
+    }
+  }, {passive:true});
 
-  // No JS pinning any more. The bar is position:sticky inside #scroller (an inner scroll
-  // container), which iOS handles reliably even with the keyboard open — the whole reason
-  // for the switch away from the root scroller. Scrolling no longer dismisses the keyboard;
-  // it closes only via the Search key, the field's ×, or tapping outside the input.
+  // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
+  // rubber — the content slides on the compositor and JS always follows a frame late).
+  // Instead: while the visual viewport is MOVING, leave the bar sticky so it rides the
+  // content natively (no JS, no lag — "moves with content"). Only once the viewport has
+  // SETTLED do we pin it once to fixed;top:=offsetTop, the correct resting spot. No rAF,
+  // no continuous sync. Every transition is a single reposition, never a chase.
+  const searchbarEl = document.querySelector('.searchbar');
+  const scrollAnchorEl = document.getElementById('scrollAnchor');
+  const vv = window.visualViewport;
+  let pinned=false;
+  const goSticky = ()=>{
+    if(!pinned) return;
+    pinned=false;
+    searchbarEl.classList.remove('pinned');
+    searchbarEl.style.top = '';           // back to the CSS sticky top:0
+    scrollAnchorEl.style.height = '0';
+  };
+  const pinFixed = (t)=>{
+    if(!pinned){
+      pinned=true;
+      scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
+      searchbarEl.classList.add('pinned');
+    }
+    searchbarEl.style.top = t+'px';
+  };
+  let scrollAfterSettle=false;   // see the searchClose handler
+  // keyboard up = the layout is (or is about to be) in its shifted state
+  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
+  if(vv){
+    let settleTimer=null, armedScrollY=0;
+    function arm(){
+      clearTimeout(settleTimer);
+      armedScrollY = window.scrollY;
+      settleTimer = setTimeout(onSettled, 120);
+    }
+    function onSettled(){
+      settleTimer=null;
+      // Deceleration fires scroll events sparsely, so 120ms of event silence can pass
+      // while the page is still creeping — pinning then, and unpinning on the next event,
+      // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
+      // has actually held, not merely the events.
+      if(Math.abs(window.scrollY - armedScrollY) > 1){ arm(); return; }
+      // viewport at rest: pin to the visible top if the keyboard's up, else plain sticky
+      if(keyboardUp()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      else goSticky();
+      // a scroll-to-results requested mid-transition runs now, against the FINAL layout
+      if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
+    }
+    function onChange(){
+      if(pinned && !keyboardUp()){
+        // Keyboard closing while pinned (e.g. after X): keep the bar at the visible top by
+        // following offsetTop per event. Going sticky here re-anchored the bar offsetTop px
+        // ABOVE the visible area — it vanished upward and slid back down, the "jump" after
+        // X. offsetTop ends at 0, so the eventual fixed->sticky handoff is seamless.
+        searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop))+'px';
+      } else {
+        // viewport in motion (keyboard sliding, or a pan): ride the content as a sticky
+        // element — native, no lag — and re-decide once it stops.
+        goSticky();
+      }
+      arm();
+    }
+    vv.addEventListener('resize', onChange);
+    vv.addEventListener('scroll', onChange);
+    const maxScrollY = ()=> document.documentElement.scrollHeight - window.innerHeight;
+    // Ordinary page scrolling fires neither vv event, so without this the settle timer
+    // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
+    // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
+    window.addEventListener('scroll', ()=>{
+      if(!keyboardUp() && window.scrollY > maxScrollY()+1){
+        // Bottom rubber-band: iOS detaches sticky during the bounce (the bar slid away
+        // with the content even with no keyboard involved). A fixed element doesn't
+        // bounce, and fixed;top:0 is the exact visual spot the stuck bar occupies, so the
+        // pin is invisible — it just holds the bar still until the bounce settles.
+        pinFixed(0);
+        arm();
+      } else if(pinned || settleTimer) onChange();
+    }, {passive:true});
+  }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
@@ -611,7 +668,13 @@
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
-    scrollToResults();
+    // If the keyboard is up (pinned OR mid-transition sticky — e.g. X right after a
+    // down-and-up scroll, before the settle re-pinned), the blur is about to close it:
+    // viewport height, spacer and bar position all about to change. A scroll computed NOW
+    // targets a layout that's about to shift and lands offset (bar mid-screen / lines
+    // above). Defer it to onSettled so it runs against the final layout instead.
+    if(pinned || keyboardUp()) scrollAfterSettle=true;
+    else scrollToResults();
   });
 
   // loading="lazy" keeps the first paint cheap, but it also means a card sitting far
@@ -641,58 +704,47 @@
   });
   render();
 
-  // ---- Keyboard bottom gap: when the keyboard is up it covers the lower part of the
-  // scroller, so the last cards can't be scrolled clear of it. Pad the bottom by the
-  // keyboard's height so they can. Cleared when the keyboard closes.
-  if(window.visualViewport){
-    const vvp = window.visualViewport;
-    const updateKbGap = ()=>{
-      const kb = Math.max(0, window.innerHeight - vvp.height - vvp.offsetTop);
-      scroller.style.paddingBottom = kb > 120 ? kb + 'px' : '';
-    };
-    vvp.addEventListener('resize', updateKbGap);
-    vvp.addEventListener('scroll', updateKbGap);
+  // ---- TEMPORARY diagnostic (?debug=1) — remove once the keyboard misplacement is solved.
+  // Built to NOT mask the bug: the previous overlay repainted a full-frame fixed box every
+  // frame, which forced iOS to keep the layer synced and made the bug vanish. This one only
+  // touches the DOM when it records a NEW WORST position (rare), so it can't paper over the
+  // drift. The rAF loop just READS the bar's rect silently — that alone doesn't mask it.
+  // Reproduce the bug, then read the WORST line + captures at the bottom (tap to select).
+  if(/(\?|&)debug=1/.test(location.search)){
+    const bar=document.querySelector('.searchbar');
+    const vv=window.visualViewport;
+    const box=document.createElement('div');
+    box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;max-height:40vh;'+
+      'overflow:auto;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;'+
+      'padding:6px;white-space:pre-wrap;-webkit-user-select:text;user-select:text';
+    box.textContent='debug on — reproduce the bug (activate search, scroll), then read here.';
+    box.onclick=()=>{ const r=document.createRange(); r.selectNodeContents(box);
+      const s=getSelection(); s.removeAllRanges(); s.addRange(r); };
+    document.body.appendChild(box);
+    const hits=[]; let worst=0;
+    const paint=()=>{ box.textContent =
+      'WORST barTop '+Math.round(worst)+'px  (negative = bar above screen). Tap to select.\n'+
+      hits.map(h=>JSON.stringify(h)).join('\n'); };
+    (function watch(){
+      const top=bar.getBoundingClientRect().top;   // silent read — proven not to mask
+      if(top < worst-0.5){                          // NEW worst only → rare repaint
+        worst=top;
+        hits.unshift({
+          barTop:Math.round(top),
+          pos: getComputedStyle(bar).position,        // sticky = pin didn't engage; fixed = fixed also broke
+          pinned: bar.classList.contains('pinned')?'Y':'-',
+          offsetTop: vv?Math.round(vv.offsetTop):'n/a',
+          vvHeight: vv?Math.round(vv.height):'n/a',
+          scrollY:Math.round(window.scrollY),
+          innerH:window.innerHeight,
+          focused: document.activeElement===document.getElementById('q')?'Y':'-',
+        });
+        hits.length=Math.min(hits.length,10);
+        paint();
+      }
+      requestAnimationFrame(watch);
+    })();
   }
-
-  // ---- Custom pull-to-refresh (the inner scroller has no native one). A downward drag
-  // that starts at the very top and passes a threshold reloads the page.
-  const ptr = document.getElementById('ptr'), ptrText = document.getElementById('ptrText');
-  const ptrSpin = document.getElementById('ptrSpin');
-  const PTR_TRIGGER = 90;
-  let ptrStartY = null;
-  scroller.addEventListener('touchstart', e=>{
-    ptrStartY = scroller.scrollTop <= 0 ? e.touches[0].clientY : null;
-  }, {passive:true});
-  scroller.addEventListener('touchmove', e=>{
-    if(ptrStartY == null) return;
-    const dy = e.touches[0].clientY - ptrStartY;
-    if(dy > 0 && scroller.scrollTop <= 0){
-      const ready = dy > PTR_TRIGGER;
-      ptr.classList.toggle('ready', ready);
-      ptrText.textContent = ready ? 'Release to refresh' : 'Pull to refresh';
-      ptrSpin.style.transform = 'rotate(' + Math.min(dy, 140) * 2.5 + 'deg)';  // wind up with the pull
-    }
-  }, {passive:true});
-  scroller.addEventListener('touchend', e=>{
-    if(ptrStartY != null && scroller.scrollTop <= 0
-       && (e.changedTouches[0].clientY - ptrStartY) > PTR_TRIGGER){
-      ptrText.textContent = 'Refreshing…';
-      ptrSpin.style.transform = '';
-      ptr.classList.add('spin');           // hand off to the continuous spin animation
-      location.reload();
-      return;
-    }
-    ptrStartY = null; ptr.classList.remove('ready'); ptrSpin.style.transform = '';
-  }, {passive:true});
-
-  // ---- Scroll-to-top button: shows once scrolled down, taps back to the top. (The iOS
-  // status-bar tap can't reach an inner scroll container and has no JS event, so this
-  // stands in for it.)
-  const toTop = document.getElementById('toTop');
-  scroller.addEventListener('scroll', ()=>{
-    toTop.classList.toggle('show', scroller.scrollTop > 700);
-  }, {passive:true});
-  toTop.addEventListener('click', ()=> scroller.scrollTo({top:0, behavior:'smooth'}));
 
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
