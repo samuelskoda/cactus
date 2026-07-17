@@ -34,6 +34,8 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%, transparent);
     backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
+  /* while the keyboard is open, fixed tracks the visual viewport more reliably than sticky */
+  .searchbar.kbd-fixed{position:fixed;left:0;right:0}
   .searchrow{position:relative;display:flex;gap:8px;align-items:center;justify-content:center}
   .search{position:relative;flex:0 1 260px;min-width:0}
   /* font-size:16px keeps iOS from auto-zooming when the field is tapped; explicit
@@ -167,6 +169,7 @@
 </header>
 
 <div id="scrollAnchor" style="height:0"></div>
+<div id="searchbarSpacer" style="height:0"></div>
 <div class="searchbar">
   <div class="wrap">
     <div class="searchrow" id="searchRow">
@@ -336,6 +339,9 @@
   // ---- modal
   const modal=document.getElementById('modal'), sheet=document.getElementById('sheet');
   const cleanName = n => n.replace(/\s*\(.*\)/,'').trim();
+  // ids are "<number>-<slug>" (e.g. "1-astrophytum-asterias") — the leading
+  // number is the plant's permanent, human-facing number shown in the detail view
+  const numberOf = d => d.id.match(/^x?\d+/)[0];
   function genusLinks(d){
     return asArr(d.genus).filter(g=>g!==SPECIAL).map(g=>
       wiki[g] ? `<a href="${wiki[g]}" target="_blank" rel="noopener">${g}</a>` : g
@@ -404,8 +410,11 @@
   }
   // turn "#plant-id" cross-references in a blurb into links that open that plant
   function linkifyBlurb(text){
-    return text.replace(/#([a-z0-9-]+)/gi, (m, id)=>
-      data.some(x=>x.id===id) ? `<a href="#${id}" class="xref" data-goto="${escAttr(id)}">#${id}</a>` : m);
+    return text.replace(/#([a-z0-9-]+)/gi, (m, id)=>{
+      const target = data.find(x=>x.id===id);
+      if(!target) return m;
+      return `<a href="#${id}" class="xref" data-goto="${escAttr(id)}">#${numberOf(target)}</a>`;
+    });
   }
   function openModal(id){
     const d=data.find(x=>x.id===id); if(!d) return;
@@ -421,7 +430,7 @@
           <div><span class="k">Species</span><span>${speciesCell(d)}</span></div>
           <div><span class="k">Genus</span><span>${genusLinks(d)}</span></div>
           <div><span class="k">Origin</span><span>${d.origin}</span></div>
-          <div><span class="k">Tag</span><span>#${d.id}</span></div>
+          <div><span class="k">Number</span><span>#${numberOf(d)}</span></div>
         </div>
       </div>`;
     sheet.querySelectorAll('[data-genus]').forEach(el=>{ el.onclick=()=>applyFilter('genus', el.dataset.genus); });
@@ -446,11 +455,25 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Focusing the field on mobile can make the browser nudge the page as the
-  // keyboard opens (a small unwanted scroll), and the sticky bar can lose its
-  // anchored position while the keyboard is up. Re-asserting the intended
-  // scroll position right after focus fixes both in one go.
-  searchInput.addEventListener('focus', ()=> setTimeout(scrollToResults, 50));
+  // On mobile, position:sticky can lose its "stuck to top" pin once the
+  // on-screen keyboard opens (the browser resizes the visual viewport in a
+  // way sticky doesn't track reliably). Switching to position:fixed while
+  // focused sidesteps that. Only do this if the bar is already pinned at the
+  // top (never jump it there — that would be exactly the unwanted scroll we
+  // don't want on a plain tap). A spacer keeps the layout from jumping when
+  // the bar leaves normal flow.
+  const searchbarEl = document.querySelector('.searchbar');
+  const searchbarSpacer = document.getElementById('searchbarSpacer');
+  searchInput.addEventListener('focus', ()=>{
+    if(searchbarEl.getBoundingClientRect().top <= 1){
+      searchbarSpacer.style.height = searchbarEl.getBoundingClientRect().height + 'px';
+      searchbarEl.classList.add('kbd-fixed');
+    }
+  });
+  searchInput.addEventListener('blur', ()=>{
+    searchbarEl.classList.remove('kbd-fixed');
+    searchbarSpacer.style.height = '0px';
+  });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');

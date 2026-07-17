@@ -4,23 +4,29 @@ Everything lives in [`data.js`](data.js) — no build step. Edit it, reload the 
 then commit & push to publish.
 
 ## Quick checklist
-1. **Add the photo** to a folder named after the plant's `id` (its tag), e.g.
-   `photos/mammillaria-elongata/IMG_9600.jpeg`. One folder per plant — it can hold several
+1. **Pick the next number.** Find the highest number currently used across all `id`s in
+   `data.js` (or the highest-numbered folder in `photos/`) and use the next one up — e.g. if
+   `37-...` is the highest, the new plant is `38-...`. **Mixed bowls use a separate `x1`,
+   `x2`, … sequence** (see "mixed bowl" below) — don't mix the two. Numbers are assigned
+   once, in the order plants are added, and never get reused or reshuffled even if the plant
+   would otherwise sort earlier in the alphabetical grid.
+2. **Add the photo** to a folder named `<number>-<slug>` after the plant's `id`, e.g.
+   `photos/38-mammillaria-elongata/IMG_9600.jpeg`. One folder per plant — it can hold several
    photos (only the one named in `file` is shown for now).
-2. **Copy the template below** into the `window.CACTI = [ … ]` array in `data.js` (anywhere;
+3. **Copy the template below** into the `window.CACTI = [ … ]` array in `data.js` (anywhere;
    the site sorts alphabetically on its own).
-3. **Fill in the fields** (see reference below). Give it a **unique `id`**.
-4. **New genus?** Add it to the `window.GENUS_WIKI` map at the top of `data.js`, or its tag
+4. **Fill in the fields** (see reference below). Give it the **numbered `id`** from step 1.
+5. **New genus?** Add it to the `window.GENUS_WIKI` map at the top of `data.js`, or its tag
    won't link to Wikipedia.
-5. **Reload** the local page (or `python3 -m http.server` then open `localhost:8000`) to check.
-6. **Publish:** commit and push — GitHub Pages rebuilds in ~1 minute.
+6. **Reload** the local page (or `python3 -m http.server` then open `localhost:8000`) to check.
+7. **Publish:** commit and push — GitHub Pages rebuilds in ~1 minute.
    ```
    git -C . add -A && git commit -m "Add <plant>" && git push
    ```
 
 ## Template
 ```js
-{ id: "genus-species", file: "photos/genus-species/IMG_XXXX.jpeg", name: "Genus species",
+{ id: "38-genus-species", file: "photos/38-genus-species/IMG_XXXX.jpeg", name: "Genus species",
   tag: "Genus species", genus: ["Genus"], region: ["Mexico & SW USA"],
   origin: "Central Mexico",
   blurb: "One or two sentences: what it looks like, flowers, and basic care." },
@@ -31,14 +37,14 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 ## Field reference
 | Field | What to put |
 |---|---|
-| `id` | **Unique, stable** slug — this is the plant's `#tag` (QR target). Use `genus-species`; add `-1`, `-2` for duplicates of the same species. **Never reuse or rename an existing id** once QR codes are printed. |
+| `id` | **Unique, stable, numbered** slug — `<number>-<genus-species>`, e.g. `38-mammillaria-elongata`. This is the plant's `#tag` (QR target, and its permanent display **Number**, e.g. `#38`). The number alone disambiguates duplicate species now, so **don't** add a trailing `-1`/`-2` to the slug — two Astrophytum myriostigma are simply `2-astrophytum-myriostigma` and `3-astrophytum-myriostigma`. **Never reuse, renumber, or rename an existing id** once QR codes are printed. |
 | `file` | Path to the photo inside the plant's own folder: `photos/<id>/IMG_XXXX.jpeg`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. |
 | `name` | The species (shown as the title, italicised). Its Wikipedia link is auto-built from the first two words. |
-| `tag` | The handwritten pot label text. Used for search; not shown on screen (the visible **Tag** row shows the `#id`). |
-| `genus` | **Array.** Normally one, e.g. `["Mammillaria"]`. Drives the green genus filter tag. |
+| `tag` | The handwritten pot label text. Used for search; not shown on screen (the visible **Number** row shows `#<the id's leading number>`). |
+| `genus` | **Array.** Normally one, e.g. `["Mammillaria"]`. Drives the green genus filter tag. For a mixed bowl, put `"Mixed & offshoots"` first — see below, it also changes the numbering prefix. |
 | `region` | **Array.** Use the existing three: `"Mexico & SW USA"`, `"Andes"`, `"Southern South America"`. Drives the grey region tag. A new value just adds a new filter chip. |
 | `origin` | Free text native range shown on the card, e.g. `"S Brazil"`. |
-| `blurb` | Description paragraph shown in the detail view. To point at another plant, reference its `#id` (e.g. `#mammillaria-compressa-1`). |
+| `blurb` | Description paragraph shown in the detail view. To point at another plant, reference its `#id` (e.g. `#20-mammillaria-compressa`) — it renders as a clickable link showing just that plant's number (`#20`). |
 | `uncertain` | `true` → yellow **tentative** tag. Omit if confident. |
 | `species` | **Mixes only.** Array of the component species (see below). |
 
@@ -52,9 +58,11 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 - **A species with no Wikipedia article** → add its name to `window.NO_WIKI` (top of
   `data.js`) so it shows as plain text instead of a dead link.
 - **A mixed bowl / multi-plant pot** → put `"Mixed & offshoots"` first in `genus`, then each
-  member genus, and add a `species` array listing the plants inside:
+  member genus, and add a `species` array listing the plants inside. Mixed bowls get their
+  **own `x`-numbered sequence** instead of a plain number — the next one is `x3` (find the
+  highest existing `xN` the same way you'd find the highest plain number):
   ```js
-  { id: "my-mixed-bowl", file: "photos/IMG_XXXX.jpeg", name: "Mixed bowl",
+  { id: "x3-my-mixed-bowl", file: "photos/x3-my-mixed-bowl/IMG_XXXX.jpeg", name: "Mixed bowl",
     genus: ["Mixed & offshoots", "Mammillaria", "Echinopsis"],
     species: ["Mammillaria bombycina", "Echinopsis oxygona"],
     region: ["Mexico & SW USA", "Southern South America"], origin: "Various",
@@ -64,6 +72,7 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
   detail view lists every species and genus in the pot.
 
 ## Removing or renaming
-- **Remove a plant:** delete its `{ … }` block. (Optionally delete the photo from `photos/`.)
-- **Fix an ID:** just edit `name`, `genus`, `blurb`, etc. Leave `id` alone if possible so
-  existing links/QR codes keep working.
+- **Remove a plant:** delete its `{ … }` block. (Optionally delete its `photos/<id>/` folder.)
+  Don't reuse its number for a different plant later.
+- **Fix a mistake:** edit `name`, `genus`, `blurb`, etc. freely. Leave `id` (and its number)
+  alone if at all possible so existing links/QR codes keep working.
