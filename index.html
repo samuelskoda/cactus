@@ -542,8 +542,7 @@
   const searchRowEl = document.getElementById('searchRow');
   document.addEventListener('touchmove', e=>{
     if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
-      searchInput.blur();
-      scheduleGlassRefresh();   // scroll-dismissal leaves the blur flickering; see below
+      searchInput.blur();   // the blur event also suspends the glass; see below
     }
   }, {passive:true});
 
@@ -576,9 +575,13 @@
       searchbarEl.classList.remove('noglass');
     }, 250);
   }
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', scheduleGlassRefresh);  // keyboard open/close
-  }
+  // Trigger on the search input's focus/blur, NOT on visualViewport resize: on iOS the
+  // visual viewport also resizes whenever Safari's toolbar collapses or expands during
+  // ordinary scrolling, so hooking the resize event suspended the glass on every plain
+  // scroll — flashing opaque/glass constantly. Focus and blur are the only moments the
+  // keyboard can actually open or close (the search field is the page's only input).
+  searchInput.addEventListener('focus', scheduleGlassRefresh);
+  searchInput.addEventListener('blur', scheduleGlassRefresh);
   // only postpones a refresh that's already due — normal scrolling never triggers one
   window.addEventListener('scroll', ()=>{ if(glassPending) scheduleGlassRefresh(); }, {passive:true});
 
