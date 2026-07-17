@@ -617,7 +617,10 @@
           // between events, leaving the bar parked at a stale offset mid-screen. With the
           // pan pre-converted, there is no stale offset to park at.
           suppress=true;                       // our own scroll — don't let it unpin
-          window.scrollTo(0, window.scrollY + off);
+          // behavior:'instant' is essential: html has scroll-behavior:smooth, so a plain
+          // scrollTo ANIMATES — a visible slide down right after tapping search. The
+          // conversion is only invisible if it happens within a single frame.
+          window.scrollTo({left:0, top: window.scrollY + off, behavior:'instant'});
           setTimeout(()=>{ suppress=false; }, 80);
           pinFixed(Math.max(0, Math.round(vv.offsetTop)));
           armedScrollY = window.scrollY;
@@ -631,8 +634,24 @@
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
+    // Bottom rubber-band: iOS detaches sticky during the bounce. iOS may CLAMP
+    // window.scrollY at max during overscroll — the overshoot shows up in
+    // visualViewport.pageTop instead, which is why a scrollY-only check never fired
+    // ("detached bar at the bottom not resolved"). Check both.
+    const bottomBounce = ()=> !keyboardUp() &&
+      (window.scrollY > maxScrollY()+1 || vv.pageTop > maxScrollY()+1);
     function onChange(){
-      if(suppress) return;
+      // Suppressed events (our own pan-conversion scroll) still re-arm the settle, so a
+      // real event swallowed by the window can't leave the state machine asleep.
+      if(suppress){ arm(); return; }
+      if(bottomBounce()){
+        // Pin fixed, following offsetTop — in overscroll the visual viewport pans BEYOND
+        // the layout viewport (offsetTop positive), so top:0 would hang the bar above the
+        // visible area; top:=offsetTop hugs the visible top through the bounce.
+        pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+        arm();
+        return;
+      }
       if(pinned && !keyboardUp()){
         // Keyboard closing while pinned (e.g. after X): hold the visible top by following
         // offsetTop per event (usually already 0 thanks to the pan conversion above, so
@@ -652,11 +671,7 @@
     // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
     window.addEventListener('scroll', ()=>{
       if(suppress) return;
-      if(!keyboardUp() && window.scrollY > maxScrollY()+1){
-        // Bottom rubber-band: iOS detaches sticky during the bounce. Pin fixed, following
-        // offsetTop — in overscroll the visual viewport pans BEYOND the layout viewport
-        // (offsetTop goes positive), so top:0 would hang the bar above the visible area
-        // ("fully detached"); top:=offsetTop hugs the visible top through the bounce.
+      if(bottomBounce()){
         pinFixed(Math.max(0, Math.round(vv.offsetTop)));
         arm();
         return;
