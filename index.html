@@ -604,6 +604,15 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
+      if(pinned && keyboardUp()){
+        // Pinned with the keyboard up: STAY pinned through page scrolling. Now that
+        // scrolling doesn't dismiss the keyboard, riding as sticky here meant the bar
+        // scrolled away with the content for as long as the keyboard was open — "not
+        // anchored". A fixed bar holds the visible top through real scrolling (measured:
+        // only a hard fling detaches it briefly, and it snaps back on its own); a
+        // viewport PAN drifts it, and the settle re-squares top:=offsetTop in one step.
+        arm(); return;
+      }
       if(pinned && !keyboardUp()){
         // Keyboard closing while pinned (e.g. after X): keep the bar at the visible top by
         // following offsetTop per event. Going sticky here re-anchored the bar offsetTop px
