@@ -542,31 +542,19 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Mobile keyboard vs the sticky bar: while the keyboard is open, iOS pans the visual
-  // viewport and sticky (layout-viewport-anchored) drifts, so a scroll gesture dismisses
-  // the keyboard — scrolling then happens with it closed, where sticky is natively smooth.
-  //
-  // But dismiss on the FIRST touchmove and the ~300ms keyboard retract runs concurrently
-  // with the scroll, and that overlap is the flicker: backdrop-filter re-samples its
-  // backdrop every frame and can't do it correctly while the viewport is being resized
-  // underneath it. It's the one state that flickers — a settled viewport never does,
-  // whether the bar was activated or not. So don't overlap them: leave the keyboard up
-  // for the duration of the scroll (viewport stable), and retract it once scrolling stops
-  // (retract on a still page). Both halves then happen with only one thing moving.
+  // Mobile keyboard vs the sticky bar: while the keyboard is open, iOS pans the
+  // visual viewport and sticky (layout-viewport-anchored) drifts. Chasing it with
+  // JS transforms stutters — iOS scrolls on the compositor thread, so JS always
+  // lands a frame late. Instead: the moment a scroll gesture starts, dismiss the
+  // keyboard. Scrolling then only ever happens with the keyboard closed, where
+  // sticky is natively smooth. (touchmove = a real finger drag; programmatic
+  // scrolls like scrollToResults() don't fire it, so typing keeps the keyboard.)
   const searchRowEl = document.getElementById('searchRow');
-  let dismissTimer=null;
-  function dismissKeyboardWhenStill(){
-    if(document.activeElement !== searchInput) return;
-    clearTimeout(dismissTimer);
-    // any further scroll re-arms this, so the blur only lands once the page is still
-    dismissTimer=setTimeout(()=>{ dismissTimer=null; searchInput.blur(); }, 150);
-  }
-  // touchmove = a real finger drag (programmatic scrolls like scrollToResults() don't fire
-  // it, so typing keeps the keyboard); the scroll listener then carries it through momentum.
   document.addEventListener('touchmove', e=>{
-    if(!searchRowEl.contains(e.target)) dismissKeyboardWhenStill();
+    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
+      searchInput.blur();   // the blur event also suspends the glass; see below
+    }
   }, {passive:true});
-  window.addEventListener('scroll', ()=>{ if(dismissTimer) dismissKeyboardWhenStill(); }, {passive:true});
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
