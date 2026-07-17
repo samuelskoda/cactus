@@ -616,6 +616,48 @@
   });
   render();
 
+  // ---- TEMPORARY diagnostic (?debug=1) — remove once the keyboard misplacement is solved.
+  // Built to NOT mask the bug: the previous overlay repainted a full-frame fixed box every
+  // frame, which forced iOS to keep the layer synced and made the bug vanish. This one only
+  // touches the DOM when it records a NEW WORST position (rare), so it can't paper over the
+  // drift. The rAF loop just READS the bar's rect silently — that alone doesn't mask it.
+  // Reproduce the bug, then read the WORST line + captures at the bottom (tap to select).
+  if(/(\?|&)debug=1/.test(location.search)){
+    const bar=document.querySelector('.searchbar');
+    const vv=window.visualViewport;
+    const box=document.createElement('div');
+    box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;max-height:40vh;'+
+      'overflow:auto;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;'+
+      'padding:6px;white-space:pre-wrap;-webkit-user-select:text;user-select:text';
+    box.textContent='debug on — reproduce the bug (activate search, scroll), then read here.';
+    box.onclick=()=>{ const r=document.createRange(); r.selectNodeContents(box);
+      const s=getSelection(); s.removeAllRanges(); s.addRange(r); };
+    document.body.appendChild(box);
+    const hits=[]; let worst=0;
+    const paint=()=>{ box.textContent =
+      'WORST barTop '+Math.round(worst)+'px  (negative = bar above screen). Tap to select.\n'+
+      hits.map(h=>JSON.stringify(h)).join('\n'); };
+    (function watch(){
+      const top=bar.getBoundingClientRect().top;   // silent read — proven not to mask
+      if(top < worst-0.5){                          // NEW worst only → rare repaint
+        worst=top;
+        hits.unshift({
+          barTop:Math.round(top),
+          styleTop:bar.style.top||'-',
+          offsetTop: vv?Math.round(vv.offsetTop):'n/a',
+          pageTop: vv?Math.round(vv.pageTop):'n/a',
+          vvHeight: vv?Math.round(vv.height):'n/a',
+          scrollY:Math.round(window.scrollY),
+          innerH:window.innerHeight,
+          focused: document.activeElement===document.getElementById('q')?'Y':'-',
+        });
+        hits.length=Math.min(hits.length,10);
+        paint();
+      }
+      requestAnimationFrame(watch);
+    })();
+  }
+
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
 </script>
