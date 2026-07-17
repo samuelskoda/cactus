@@ -467,30 +467,50 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // On mobile, position:sticky can lose its "stuck to top" pin once the
-  // on-screen keyboard opens (the browser resizes the visual viewport in a
-  // way sticky doesn't track reliably). Switching to position:fixed while
-  // focused sidesteps that. Only do this if the bar is already pinned at the
-  // top (never jump it there — that would be exactly the unwanted scroll we
-  // don't want on a plain tap). A spacer keeps the layout from jumping when
-  // the bar leaves normal flow.
+  // Keeping the bar pinned while the mobile keyboard is open.
+  //
+  // When the keyboard opens, iOS shrinks the *visual* viewport (what you can see)
+  // but leaves the *layout* viewport full-size. position:sticky and position:fixed
+  // both anchor to the layout viewport, so the bar sits at the top of a region
+  // that's partly hidden behind/above the visible area — it "unsticks" and drifts
+  // as you scroll. visualViewport.offsetTop reports how far the visible area has
+  // been panned down inside the layout viewport, so translating the bar by that
+  // amount puts it back at the top of what's actually on screen.
   const searchbarEl = document.querySelector('.searchbar');
   const searchbarSpacer = document.getElementById('searchbarSpacer');
-  searchInput.addEventListener('focus', ()=>{
-    if(searchbarEl.getBoundingClientRect().top <= 1){
-      // The spacer must replace the bar's FULL flow footprint: its height *plus*
-      // its margin-bottom. Replacing only the height leaves the margin behind and
-      // yanks everything below up by that much — the "small bump" on focus.
-      const cs = getComputedStyle(searchbarEl);
-      const footprint = searchbarEl.getBoundingClientRect().height + (parseFloat(cs.marginBottom) || 0);
-      searchbarSpacer.style.height = footprint + 'px';
-      searchbarEl.classList.add('kbd-fixed');
-    }
-  });
-  searchInput.addEventListener('blur', ()=>{
+  const vv = window.visualViewport;
+
+  function pinBarToVisibleTop(){
+    if(!searchbarEl.classList.contains('kbd-fixed')) return;
+    searchbarEl.style.transform = `translateY(${vv ? vv.offsetTop : 0}px)`;
+  }
+  if(vv){
+    vv.addEventListener('scroll', pinBarToVisibleTop);
+    vv.addEventListener('resize', pinBarToVisibleTop);
+  }
+
+  function unpinBar(){
     searchbarEl.classList.remove('kbd-fixed');
+    searchbarEl.style.transform = '';
     searchbarSpacer.style.height = '0px';
-  });
+  }
+  function pinBar(){
+    if(searchbarEl.classList.contains('kbd-fixed')) return;
+    // Only take over when the bar is already at the top — never yank it there,
+    // that would be the unwanted jump-on-tap.
+    if(searchbarEl.getBoundingClientRect().top > 1) return;
+    // The spacer must replace the bar's FULL flow footprint: height *plus*
+    // margin-bottom. Replacing only the height drops the margin and pulls
+    // everything below up by that much (the 12px bump on focus).
+    const cs = getComputedStyle(searchbarEl);
+    const footprint = searchbarEl.getBoundingClientRect().height + (parseFloat(cs.marginBottom) || 0);
+    searchbarSpacer.style.height = footprint + 'px';
+    searchbarEl.classList.add('kbd-fixed');
+    pinBarToVisibleTop();
+  }
+
+  searchInput.addEventListener('focus', pinBar);
+  searchInput.addEventListener('blur', unpinBar);
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
