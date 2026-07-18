@@ -38,7 +38,7 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 ## Field reference
 | Field | What to put |
 |---|---|
-| `id` | **Unique, stable, numbered** slug — `<number>-<genus-species>`, e.g. `38-mammillaria-elongata`. This is the plant's `#tag` (QR target, and its permanent display **Catalog #**, e.g. `38`). Its page URL is `?p=<id>`; the older `#<id>` form still opens the same plant, so QR codes already printed keep working. The number alone disambiguates duplicate species now, so **don't** add a trailing `-1`/`-2` to the slug — two Astrophytum myriostigma are simply `2-astrophytum-myriostigma` and `3-astrophytum-myriostigma`. **Never reuse, renumber, or rename an existing id** once QR codes are printed. |
+| `id` | **Unique, stable, numbered** slug — `<number>-<genus-species>`, e.g. `38-mammillaria-elongata`. This is the plant's `#tag` (its permanent display **Catalog #**, e.g. `38`). Its page URL is `?p=<id>`; the older `#<id>` form still resolves too. The number alone disambiguates duplicate species now, so **don't** add a trailing `-1`/`-2` to the slug — two Astrophytum myriostigma are simply `2-astrophytum-myriostigma` and `3-astrophytum-myriostigma`. **Avoid reusing or renaming an existing id** — any link already shared for that plant would stop resolving. |
 | `file` | Path to the photo inside the plant's own folder: `photos/<id>/IMG_XXXX.jpeg`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. |
 | `name` | The species (shown as the title, italicised). Its Wikipedia link is auto-built from the first two words. |
 | `tag` | The handwritten pot label text. Used for search; not shown on screen (the visible **Number** row shows `#<the id's leading number>`). |
@@ -77,4 +77,4 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 - **Remove a plant:** delete its `{ … }` block. (Optionally delete its `photos/<id>/` folder.)
   Don't reuse its number for a different plant later.
 - **Fix a mistake:** edit `name`, `genus`, `blurb`, etc. freely. Leave `id` (and its number)
-  alone if at all possible so existing links/QR codes keep working.
+  alone if at all possible so existing links keep working.

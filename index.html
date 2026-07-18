@@ -210,9 +210,10 @@
   .sheet .tags{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
   /* card marker: the plant has a photo of it in flower. Sits with the name, not as a badge,
      so it reads as part of the title rather than as another filter chip. */
-  /* Glued to the preceding word: on its own it could wrap to a line by itself, which read
-     as a stray icon under the name. The name may still wrap; the marker rides the last word. */
-  .bloom{font-size:.85em;vertical-align:baseline;line-height:1;white-space:nowrap}
+  /* Card markers (in flower, mixed planting). Glued to the preceding word: on their own they
+     could wrap to a line by themselves, which read as a stray icon under the name. The name may
+     still wrap; the markers ride the last word. */
+  .mark{font-size:.85em;vertical-align:baseline;line-height:1;white-space:nowrap}
   .badge.click{cursor:pointer}
   .badge.click:hover{opacity:.78}
   .kv{margin:14px 0;border-top:1px solid var(--line);padding-top:14px}
@@ -301,7 +302,7 @@
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
      index.html — a stale data.js here previously broke photo paths and clicks -->
-<script src="data.js?v=7"></script>
+<script src="data.js?v=8"></script>
 <script>
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
@@ -324,6 +325,7 @@
       plants:'Plants', species:'Species', genera:'Genera', regions:'Regions',
       searchPlaceholder:'Search…', searchAria:'Search', clearSearch:'Clear search', filter:'Filter',
       tentative:'Tentative', inFlower:'In flower', inFlowerCard:'Photographed in flower',
+      mixedCard:'Mixed planting',
       mixed:'Mixed & offshoots',
       noMatch:'No plants match those filters.',
       count:(shown,total)=>`${shown} of ${total} plants`,
@@ -343,6 +345,7 @@
       plants:'Rastlín', species:'Druhov', genera:'Rodov', regions:'Oblasti',
       searchPlaceholder:'Hľadať…', searchAria:'Hľadať', clearSearch:'Vymazať hľadanie', filter:'Filter',
       tentative:'Neisté', inFlower:'Kvitne', inFlowerCard:'Fotografia s kvetom',
+      mixedCard:'Miešaná výsadba',
       mixed:'Miešané a odnože',
       noMatch:'Žiadne rastliny nezodpovedajú filtrom.',
       count:(shown,total)=>`${shown} z ${total} rastlín`,
@@ -419,7 +422,7 @@
   function buildOther(el){
     if(allGenera.includes(SPECIAL)){
       const b=document.createElement('button');
-      b.className='chip c-mixed'; b.textContent=genusLabel(SPECIAL); b.dataset.other='mixed';
+      b.className='chip c-mixed'; b.textContent='🔀 '+genusLabel(SPECIAL); b.dataset.other='mixed';
       b.onclick=()=>selectFilter('genus', SPECIAL);
       el.appendChild(b);
     }
@@ -470,7 +473,7 @@
     return `<article class="card" data-id="${escAttr(d.id)}" onclick="openModal('${d.id}')">
       <div class="thumb"><img loading="lazy" src="${d.file}" alt="${escAttr(nameOf(d))}"></div>
       <div class="body">
-        <p class="sci${isMixed(d)?' plain':''}">${nameOf(d)} ${d.uncertain?'<span class="badge q">?</span>':''}${d.flower?`&nbsp;<span class="bloom" title="${escAttr(t('inFlowerCard'))}" aria-label="${escAttr(t('inFlowerCard'))}">🌸</span>`:''}</p>
+        <p class="sci${isMixed(d)?' plain':''}">${nameOf(d)} ${d.uncertain?'<span class="badge q">?</span>':''}${isMixed(d)?`&nbsp;<span class="mark" data-mark="mixed" title="${escAttr(t('mixedCard'))}" aria-label="${escAttr(t('mixedCard'))}">🔀</span>`:''}${d.flower?`&nbsp;<span class="mark" data-mark="flower" title="${escAttr(t('inFlowerCard'))}" aria-label="${escAttr(t('inFlowerCard'))}">🌸</span>`:''}</p>
         <div class="meta"><span>${originLabel(d.origin)}</span></div>
       </div>
     </article>`;
@@ -574,7 +577,7 @@
   // all filter tags on one line, ordered: blue Mixed, grey Region, green Genus, yellow tentative, pink in-flower
   function allTags(d){
     const genera = asArr(d.genus);
-    const blue   = genera.filter(g=>g===SPECIAL).map(g=>`<span class="badge m click" data-genus="${escAttr(g)}">${genusLabel(g)}</span>`);
+    const blue   = genera.filter(g=>g===SPECIAL).map(g=>`<span class="badge m click" data-genus="${escAttr(g)}">🔀 ${genusLabel(g)}</span>`);
     const grey   = asArr(d.region).map(r=>`<span class="badge r click" data-region="${escAttr(r)}">${regionLabel(r)}</span>`);
     const green  = genera.filter(g=>g!==SPECIAL).map(g=>`<span class="badge click" data-genus="${escAttr(g)}">${g}</span>`);
     const yellow = d.uncertain ? [`<span class="badge q click" data-tentative="1">? ${t('tentative')}</span>`] : [];
@@ -1100,7 +1103,7 @@
     // facet chips keep their canonical dataset.val; only the visible label changes
     document.querySelectorAll('#regionFacet .chip').forEach(c=>{ c.textContent = regionLabel(c.dataset.val); });
     document.querySelectorAll('#genusFacet .chip').forEach(c=>{ c.textContent = genusLabel(c.dataset.val); });
-    const mix=document.querySelector('#otherFacet .chip[data-other="mixed"]'); if(mix) mix.textContent = genusLabel(SPECIAL);
+    const mix=document.querySelector('#otherFacet .chip[data-other="mixed"]'); if(mix) mix.textContent = '🔀 '+genusLabel(SPECIAL);
     const ten=document.querySelector('#otherFacet .chip[data-other="tentative"]'); if(ten) ten.textContent = '? '+L.tentative;
     const flw=document.querySelector('#otherFacet .chip[data-other="flower"]');
     if(flw) flw.textContent = '🌸 '+L.inFlower;
@@ -1112,8 +1115,10 @@
         const sci = el.querySelector('.sci');
         if(sci && sci.firstChild) sci.firstChild.textContent = nameOf(d) + ' ';
       }
-      const bloom = el.querySelector('.bloom');
-      if(bloom){ bloom.title = L.inFlowerCard; bloom.setAttribute('aria-label', L.inFlowerCard); }
+      el.querySelectorAll('.mark').forEach(m=>{
+        const txt = m.dataset.mark==='mixed' ? L.mixedCard : L.inFlowerCard;
+        m.title = txt; m.setAttribute('aria-label', txt);
+      });
     }
     render();
     if(openId){ const d=data.find(x=>x.id===openId); if(d) renderModal(d); }
@@ -1125,8 +1130,8 @@
   });
   applyLang();
 
-  // deep-link support (QR / shared link). The "#id" form is still accepted: QR codes carrying
-  // it are already printed on the pot labels, and those must keep working forever.
+  // deep-link support. The older "#id" form is still accepted so that any link shared before
+  // the switch to ?p= still resolves; it costs one line and upgrades itself once open.
   {
     const id = new URLSearchParams(location.search).get('p') || decodeURIComponent(location.hash.slice(1));
     if(id && data.some(d=>d.id===id)) openModal(id);
