@@ -617,9 +617,15 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      // Deliberately do NOT touch the bar's top here. While pinned the bar is sticky with a
-      // constant top; changing it mid-scroll (chasing offsetTop) is exactly what made it
-      // jumpy. offsetTop is only re-read when the scroll settles (onSettled). Just re-arm.
+      // While pinned, keep the sticky bar's top = offsetTop so it stays at the visible top
+      // as iOS re-pans during the scroll (offsetTop drops as you scroll up — a constant top
+      // leaves the bar stuck too low). This runs on the visualViewport 'scroll' event, which
+      // fires IN SYNC with the pan, so it tracks smoothly. It is NOT a per-frame rAF chase —
+      // that fought the compositor and was the jump. sticky (scroll layer) has no paint lag.
+      if(pinned){
+        const t=Math.max(0,Math.round(vv.offsetTop));
+        if(searchbarEl.style.top!==t+'px') searchbarEl.style.top=t+'px';
+      }
       arm();
     }
     vv.addEventListener('resize', onChange);
