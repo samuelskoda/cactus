@@ -558,28 +558,30 @@
   // search row dismisses the keyboard. Touches inside the row (the field, ×, Filter) are
   // excluded so using them doesn't close it.
   const searchRowEl = document.getElementById('searchRow');
-  // No scroll-dismiss. Measured in the iOS simulator: dismissing the keyboard as the scroll
-  // starts makes iOS hold the shrunk keyboard viewport through the whole scroll while
-  // thrashing offsetTop 0<->negative every frame — and a fixed OR sticky bar rides that and
-  // flies above the viewport and back. That was the flicker (barTop swinging 0..-375). With
-  // the keyboard left up, the viewport stays stable and the pinned bar holds barTop≈0 for
-  // the entire scroll (measured -0.4..0.3). The keyboard closes via its Search key or ×.
-
-  // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
-  // rubber — the content slides on the compositor and JS always follows a frame late).
-  // Instead: while the visual viewport is MOVING, leave the bar sticky so it rides the
-  // content natively (no JS, no lag — "moves with content"). Only once the viewport has
-  // SETTLED do we pin it once to fixed;top:=offsetTop, the correct resting spot. No rAF,
-  // no continuous sync. Every transition is a single reposition, never a chase.
   const searchbarEl = document.querySelector('.searchbar');
   const scrollAnchorEl = document.getElementById('scrollAnchor');
   const vv = window.visualViewport;
-  let pinned=false;
+  let pinned=false, scrolling=false;
+  // Three states while the keyboard is/was up:
+  //  goSticky  – default: CSS position:sticky, top:0 (normal browsing, no keyboard).
+  //  pinFixed  – AT REST with the keyboard up: fixed at top=offsetTop = the visible top,
+  //              so the bar sits correctly while you type.
+  //  goStatic  – DURING a scroll: the bar becomes normal in-flow content. It scrolls in
+  //              lockstep with the page (tracks the content, no lag) and does NOT reference
+  //              the visual viewport — so the keyboard-close offsetTop thrash can't flick it.
+  //              This is the merge: content-tracking (scroll-dismiss) WITHOUT the flicker.
   const goSticky = ()=>{
-    if(!pinned) return;
     pinned=false;
     searchbarEl.classList.remove('pinned');
-    searchbarEl.style.top = '';           // back to the CSS sticky top:0
+    searchbarEl.style.position='';        // back to CSS sticky
+    searchbarEl.style.top = '';
+    scrollAnchorEl.style.height = '0';
+  };
+  const goStatic = ()=>{
+    pinned=false;
+    searchbarEl.classList.remove('pinned');
+    searchbarEl.style.position='static';  // in flow → scrolls with content, ignores viewport
+    searchbarEl.style.top = '';
     scrollAnchorEl.style.height = '0';
   };
   const pinFixed = (t)=>{
@@ -587,10 +589,20 @@
       pinned=true;
       scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
       searchbarEl.classList.add('pinned');
+      searchbarEl.style.position='';      // let .pinned's position:fixed apply
       startTrack();   // keep top glued to offsetTop every frame while pinned
     }
     searchbarEl.style.top = t+'px';
   };
+  // Scroll-dismiss + go-static: touching outside the search row (the start of a scroll)
+  // dismisses the keyboard AND drops the bar into flow so it tracks the content flicker-free.
+  document.addEventListener('touchstart', e=>{
+    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
+      scrolling=true;
+      searchInput.blur();
+      goStatic();
+    }
+  }, {passive:true});
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
   const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
@@ -632,20 +644,18 @@
       // above 0). With the instant focus scroll iOS no longer pans, so offsetTop stays ~0
       // and the bar just stays plain sticky — never switching fixed<->sticky, which is the
       // switch that flickered. The pin remains a fallback for the case iOS pans anyway.
+      scrolling=false;
+      // At rest: pin to the visible top if the keyboard's still up (typing), else plain sticky.
       if(keyboardUp() && Math.round(vv.offsetTop) > 24) pinFixed(Math.round(vv.offsetTop));
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      if(pinned){
-        // Stay FIXED through the whole keyboard-close scroll; hand back to sticky only when
-        // everything has settled (in onSettled). Measured in the iOS simulator: during a
-        // scroll-dismiss, offsetTop oscillates 0 <-> big-negative every frame while the
-        // keyboard height stays shrunk. If we unpin to sticky, the sticky bar follows those
-        // swings and flies ABOVE the viewport and back each frame — the violent flicker.
-        // A fixed bar clamped to top=max(0,offsetTop) sits at top:0 through the negatives,
-        // which can only ever put it AT or BELOW its spot, never above.
+      // While scrolling the bar is static (in flow) and must be left alone — it's riding the
+      // content. Touching its position here is what referenced the thrashing viewport and
+      // flickered. Only when it's pinned at rest do we keep top glued to offsetTop.
+      if(!scrolling && pinned){
         searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop)) + 'px';
       }
       arm();
