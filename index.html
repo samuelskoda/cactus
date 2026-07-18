@@ -601,6 +601,15 @@
   const naturalTop = ()=> Math.max(0, scrollAnchorEl.getBoundingClientRect().top);
   // offsetTop, with compositor noise removed — see the deadband note in trackTop.
   const panOffset = ()=>{ const v=Math.max(0, Math.round(vv.offsetTop)); return v<PAN_EPS?0:v; };
+  // How far the slot must be below the top before the bar is handed back to sticky. Swapping at
+  // literally >0 let a 1-3px rounding/stale read flap the bar to plain sticky while the keyboard
+  // was up — the state where iOS sticky is unreliable — and that is the regime a *tiny* scroll
+  // sits in. A few px of hysteresis keeps the pin until the slot has really moved.
+  const STICK_EPS = 4;
+  // The slot offset actually used to POSITION the pinned bar. While pinned the slot is at (or a
+  // hair above) the top by construction, so anything within STICK_EPS is rounding, not position;
+  // adding it to top would sit the bar those px below flush, which is the thin gap.
+  const slotTop = ()=>{ const v=naturalTop(); return v>STICK_EPS ? v : 0; };
   // How far offsetTop must leave its resting value to count as a real viewport pan rather than
   // compositor jitter. A keyboard pan moves several hundred px; the jitter is a few.
   const PAN_EPS = 24;
@@ -619,7 +628,7 @@
     }
     closing=false; panHold=false;
     restOff = t;
-    searchbarEl.style.top = (t + naturalTop())+'px';
+    searchbarEl.style.top = (t + slotTop())+'px';
     // Start the tracking loop on EVERY pin, not just the unpinned->pinned transition. A pin
     // that arrived while the loop was stopped (re-pinning during a bounce) otherwise left the
     // bar frozen at whatever top it was given, so it stopped following the pan.
@@ -643,7 +652,7 @@
     // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
     // so set it after.
     if(!pinned) pinFixed(panOffset());
-    closing=true; searchbarEl.style.top=naturalTop()+'px';
+    closing=true; searchbarEl.style.top=slotTop()+'px';
     // Restart the stillness count. It measures "the viewport is not moving, so no close is
     // actually happening" — but before the blur the viewport had been at rest with the keyboard
     // up, so the count was already way past the threshold and the safety net fired on the very
@@ -669,7 +678,7 @@
     // sticky to get wrong. Excluding `closing` here meant an up-swipe (which both dismisses and
     // scrolls) stayed pinned and chased the slot — measured barTop trailing anchorTop by one
     // frame the whole way, which is exactly the jitter.
-    if(naturalTop() > 0){ goSticky(); trackRaf=0; return; }
+    if(naturalTop() > STICK_EPS){ goSticky(); trackRaf=0; return; }
     // Two different reasons to hold top:0, with different exits — conflating them broke both.
     // `closing`: a blur fired, the keyboard is on its way out. Hold until it is fully gone. It
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
@@ -684,9 +693,9 @@
       // before the close began — the jump when using the checkmark. A real close always gets
       // moving well within 1s, so only past that does stillness really mean nothing is coming.
       if(keyboardUp() && stillFrames>=60){
-        closing=false; restOff=off; searchbarEl.style.top=((off<PAN_EPS?0:off)+naturalTop())+'px';
+        closing=false; restOff=off; searchbarEl.style.top=((off<PAN_EPS?0:off)+slotTop())+'px';
       } else {
-        searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
+        searchbarEl.style.top=slotTop()+'px';                     // fixed is visual-relative now
       }
       trackRaf=requestAnimationFrame(trackTop);
       return;
@@ -698,9 +707,9 @@
     if(panHold){
       if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
-        panHold=false; restOff=off; searchbarEl.style.top=((off<PAN_EPS?0:off)+naturalTop())+'px';
+        panHold=false; restOff=off; searchbarEl.style.top=((off<PAN_EPS?0:off)+slotTop())+'px';
       } else {
-        searchbarEl.style.top=naturalTop()+'px';
+        searchbarEl.style.top=slotTop()+'px';
       }
       trackRaf=requestAnimationFrame(trackTop);
       return;
@@ -725,7 +734,7 @@
     // ordinary keyboard-up scroll, and treating that as a pan flipped the bar to top:0 while
     // the keyboard was still stable-up (fixed still layout-relative) = bar off-screen.
     if(Math.abs(off-restOff)>PAN_EPS){
-      panHold=true; searchbarEl.style.top=naturalTop()+'px';
+      panHold=true; searchbarEl.style.top=slotTop()+'px';
       trackRaf=requestAnimationFrame(trackTop); return;
     }
     // Deadband the offsetTop noise before it reaches top. The compositor wobbles offsetTop by a
@@ -733,7 +742,7 @@
     // — a thin gap along the top edge, intermittent because it depends on catching a wobbling
     // frame. A real keyboard pan is hundreds of px (and is handled by the hold above), so
     // anything under PAN_EPS here is noise, never signal.
-    const want=((off<PAN_EPS?0:off)+naturalTop())+'px';
+    const want=((off<PAN_EPS?0:off)+slotTop())+'px';
     if(searchbarEl.style.top!==want) searchbarEl.style.top=want;
     trackRaf=requestAnimationFrame(trackTop);
   };
@@ -766,7 +775,7 @@
       // ...but only once the flow slot is scrolled past. If the slot is still on screen the
       // bar's correct place IS its flow position, which sticky gives natively — pinning there
       // means chasing it per frame, which jitters.
-      if(keyboardUp() && naturalTop()===0) pinFixed(panOffset());
+      if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
@@ -787,7 +796,7 @@
       if(!closing && !keyboardUp() && Math.round(vv.offsetTop) > 0){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
-      else if(!pinned && keyboardUp() && naturalTop()===0) pinFixed(panOffset());
+      else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
