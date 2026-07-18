@@ -575,20 +575,21 @@
   const scrollAnchorEl = document.getElementById('scrollAnchor');
   const vv = window.visualViewport;
   let pinned=false;
-  // The bar is position:sticky always (never position:fixed). To sit at the visible top
-  // while the keyboard pans the viewport, it sticks at top=offsetTop instead of top:0.
-  // Sticky is part of the scroll layer, so it moves WITH the compositor during a scroll —
-  // no fixed-element paint lag (the transient gap that opened above a fixed bar mid-scroll,
-  // invisible to getBoundingClientRect and unreproducible in the simulator). Staying in
-  // flow, it needs no spacer either.
   const goSticky = ()=>{
     if(!pinned) return;
     pinned=false;
+    searchbarEl.classList.remove('pinned');
     searchbarEl.style.top = '';           // back to the CSS sticky top:0
+    scrollAnchorEl.style.height = '0';
   };
   const pinFixed = (t)=>{
-    if(!pinned){ pinned=true; startTrack(); }   // keep top glued to offsetTop every frame
-    searchbarEl.style.top = t+'px';             // sticky at top=offsetTop = the visible top
+    if(!pinned){
+      pinned=true;
+      scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
+      searchbarEl.classList.add('pinned');
+      startTrack();   // keep top glued to offsetTop every frame while pinned
+    }
+    searchbarEl.style.top = t+'px';
   };
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
@@ -605,6 +606,11 @@
     if(!pinned){ trackRaf=0; return; }
     const t=Math.max(0,Math.round(vv.offsetTop));
     if(searchbarEl.style.top!==t+'px') searchbarEl.style.top=t+'px';
+    // Force a per-frame layout read of the bar. On some devices iOS lets a fixed element
+    // lag on the compositor thread during a scroll (a transient gap opens above the bar
+    // and snaps back when scrolling stops); reading its rect each frame nudges iOS to keep
+    // the layer synced to its CSS position.
+    void searchbarEl.getBoundingClientRect().top;
     trackRaf=requestAnimationFrame(trackTop);
   };
   const startTrack=()=>{ if(!trackRaf) trackRaf=requestAnimationFrame(trackTop); };
