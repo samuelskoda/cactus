@@ -590,6 +590,15 @@
   // restOff = the offsetTop the bar was pinned AT while the viewport sat still. Once the live
   // offsetTop leaves it, the viewport has started panning — see trackTop.
   let pinned=false, closing=false, panHold=false, restOff=0;
+  // What sticky would do: the bar rests at the screen top only once its flow slot has been
+  // scrolled past. Scroll back UP toward the header and the slot comes down the screen again,
+  // and the bar must come with it. Pinning flat at 0 instead left it floating over the hero,
+  // then dropping into place the moment the pin released — the jump when scrolling up.
+  // #scrollAnchor holds that flow slot while the bar is pinned, so its live rect IS the answer.
+  // Read live, not snapshotted at pin time: a snapshot taken before the focus scroll settled
+  // was stale by ~300px and planted the bar mid-screen. Unlike a fixed element's rect, an
+  // in-flow rect here reads against the visible top, so it needs no regime correction.
+  const naturalTop = ()=> Math.max(0, scrollAnchorEl.getBoundingClientRect().top);
   // How far offsetTop must leave its resting value to count as a real viewport pan rather than
   // compositor jitter. A keyboard pan moves several hundred px; the jitter is a few.
   const PAN_EPS = 24;
@@ -608,7 +617,7 @@
     }
     closing=false; panHold=false;
     restOff = t;
-    searchbarEl.style.top = t+'px';
+    searchbarEl.style.top = (t + naturalTop())+'px';
     // Start the tracking loop on EVERY pin, not just the unpinned->pinned transition. A pin
     // that arrived while the loop was stopped (re-pinning during a bounce) otherwise left the
     // bar frozen at whatever top it was given, so it stopped following the pan.
@@ -626,7 +635,7 @@
   // work: at close start off is still ~restOff, so the flip fires late and the bar renders
   // restOff px down = mid-screen (seen on video during a swipe-dismiss). The release below
   // covers the case where the close does not actually follow.
-  searchInput.addEventListener('blur', ()=>{ if(pinned){ closing=true; searchbarEl.style.top='0px'; } });
+  searchInput.addEventListener('blur', ()=>{ if(pinned){ closing=true; searchbarEl.style.top=naturalTop()+'px'; } });
   let trackRaf=0, lastOff=-1, stillFrames=0;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
@@ -642,9 +651,9 @@
       // A real close moves the viewport every frame, so a long stillness means no close is
       // happening and the hold would strand the bar off-screen. Long enough not to trip mid-close.
       if(keyboardUp() && stillFrames>=12){
-        closing=false; restOff=off; searchbarEl.style.top=off+'px';
+        closing=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
-        searchbarEl.style.top='0px';                                 // fixed is visual-relative now
+        searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
       }
       trackRaf=requestAnimationFrame(trackTop);
       return;
@@ -656,9 +665,9 @@
     if(panHold){
       if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
-        panHold=false; restOff=off; searchbarEl.style.top=off+'px';
+        panHold=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
-        searchbarEl.style.top='0px';
+        searchbarEl.style.top=naturalTop()+'px';
       }
       trackRaf=requestAnimationFrame(trackTop);
       return;
@@ -683,10 +692,11 @@
     // ordinary keyboard-up scroll, and treating that as a pan flipped the bar to top:0 while
     // the keyboard was still stable-up (fixed still layout-relative) = bar off-screen.
     if(Math.abs(off-restOff)>PAN_EPS){
-      panHold=true; searchbarEl.style.top='0px';
+      panHold=true; searchbarEl.style.top=naturalTop()+'px';
       trackRaf=requestAnimationFrame(trackTop); return;
     }
-    if(searchbarEl.style.top!==off+'px') searchbarEl.style.top=off+'px';
+    const want=(off+naturalTop())+'px';
+    if(searchbarEl.style.top!==want) searchbarEl.style.top=want;
     trackRaf=requestAnimationFrame(trackTop);
   };
   let scrollAfterSettle=false;   // see the searchClose handler
