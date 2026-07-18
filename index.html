@@ -793,7 +793,14 @@
       // clearly mid-screen on video) while getBoundingClientRect still reported 0, because the
       // rect API answers in LAYOUT coordinates during a pan. Trust the video, not the rect.
       // Then reuse the `closing` hold: keep top:0 until the pan unwinds, then hand to sticky.
-      if(!closing && !keyboardUp() && Math.round(vv.offsetTop) > 0){ pinFixed(0); closing=true; }
+      // panOffset(), not raw offsetTop: this is the one trigger that still took any nonzero
+      // value as a bounce. Scrolling DOWN on a real device also collapses Safari's toolbar,
+      // which perturbs the visual viewport by a few px (traces show vv.height overshooting
+      // innerHeight, 754 vs 714). Reading that as a rubber-band pinned the bar at top:0 on the
+      // visual-relative assumption while it was still layout-relative, shifting it a few px —
+      // a thin gap, only while scrolling down, and only when the toolbar transition coincides.
+      // A real bounce reaches ~200px, so requiring PAN_EPS costs it nothing.
+      if(!closing && !keyboardUp() && panOffset() > 0){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
       else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
