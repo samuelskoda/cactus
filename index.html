@@ -302,7 +302,7 @@
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
      index.html — a stale data.js here previously broke photo paths and clicks -->
-<script src="data.js?v=9"></script>
+<script src="data.js?v=10"></script>
 <script>
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
@@ -389,6 +389,11 @@
   const blurbOf     = d => (lang === 'sk' && d.blurb_sk) ? d.blurb_sk : d.blurb;
   // Only the two mixed bowls carry a name_sk; every other name is Latin and never translated.
   const nameOf      = d => (lang === 'sk' && d.name_sk) ? d.name_sk : d.name;
+  // Cards get a smaller copy of the same photo, by convention "<name>-t.webp" beside it.
+  // The grid is what a cold visit actually pays for — every card is fetched, and the warm-up
+  // below pulls the ones off-screen too — whereas a full-size photo loads only when its plant
+  // is opened. Derived from the path rather than stored, so data.js keeps one entry per photo.
+  const thumbOf     = d => d.file.replace(/\.webp$/, '-t.webp');
 
   // ---- stats
   document.getElementById('s-total').textContent = data.length;
@@ -471,7 +476,7 @@
   }
   function card(d){
     return `<article class="card" data-id="${escAttr(d.id)}" onclick="openModal('${d.id}')">
-      <div class="thumb"><img loading="lazy" src="${d.file}" alt="${escAttr(nameOf(d))}"></div>
+      <div class="thumb"><img loading="lazy" src="${thumbOf(d)}" alt="${escAttr(nameOf(d))}"></div>
       <div class="body">
         <p class="sci${isMixed(d)?' plain':''}">${nameOf(d)} ${d.uncertain?'<span class="badge q">?</span>':''}${isMixed(d)?`&nbsp;<span class="mark" data-mark="mixed" title="${escAttr(t('mixedCard'))}" aria-label="${escAttr(t('mixedCard'))}">🔀</span>`:''}${d.flower?`&nbsp;<span class="mark" data-mark="flower" title="${escAttr(t('inFlowerCard'))}" aria-label="${escAttr(t('inFlowerCard'))}">🌸</span>`:''}</p>
         <div class="meta"><span>${originLabel(d.origin)}</span></div>
