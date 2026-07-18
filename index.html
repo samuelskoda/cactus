@@ -550,28 +550,28 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Dismiss the keyboard on touchSTART (finger lands), not touchmove (finger already
-  // dragging). sticky breaks on the root scroller while the keyboard is mid-close, so the
-  // close must overlap the scroll as little as possible: blurring at touchstart starts the
-  // close on a STILL page, before any scrolling — the same reason a deliberate tap outside
-  // never flickers. It also gives standard iOS behavior: touching anywhere outside the
-  // search row dismisses the keyboard. Touches inside the row (the field, ×, Filter) are
-  // excluded so using them doesn't close it.
+  // Tap vs swipe, decided at touchEND, and handled opposite ways:
+  //  - Tap outside the search row -> blur. A programmatic close on a still page; trackTop's
+  //    `closing` hold keeps the bar at top:0 through it.
+  //  - Swipe -> NOT blurred, and the scroll is NOT blocked. iOS runs its native
+  //    scroll-to-dismiss, so one gesture both dismisses the keyboard and scrolls.
+  // We used to blur on touchstart and preventDefault every touchmove while the keyboard was
+  // up, which spent the first swipe on the dismiss and required a second one to scroll. That
+  // was needed only because the bar was CHASING offsetTop per frame during the close; see
+  // trackTop for the hold that replaces the chase and makes the single gesture viable.
   const searchRowEl = document.getElementById('searchRow');
+  let tStartY=0, tMoved=false, tOutside=false;
   document.addEventListener('touchstart', e=>{
-    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
-      searchInput.blur();
-    }
+    tOutside = (document.activeElement === searchInput && !searchRowEl.contains(e.target));
+    tStartY = e.touches[0] ? e.touches[0].clientY : 0;
+    tMoved = false;
   }, {passive:true});
-  // BLOCK scrolling while the keyboard is up or still closing. The flicker was the scroll
-  // overlapping the keyboard-close viewport thrash (offsetTop swinging 0<->-345). Preventing
-  // the scroll until the keyboard is fully gone means the close happens on a STILL page (like
-  // pressing Done / tapping outside — which never flickered) and the scroll only begins
-  // afterward, with no overlap. The touchstart above dismisses the keyboard, so a swipe
-  // reads as: first dismiss the keyboard (page held still), then scroll.
   document.addEventListener('touchmove', e=>{
-    if(keyboardUp() && e.cancelable) e.preventDefault();
-  }, {passive:false});
+    if(e.touches[0] && Math.abs(e.touches[0].clientY - tStartY) > 8) tMoved = true;
+  }, {passive:true});
+  document.addEventListener('touchend', ()=>{
+    if(tOutside && !tMoved) searchInput.blur();
+  }, {passive:true});
 
   // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
   // rubber — the content slides on the compositor and JS always follows a frame late).
@@ -582,7 +582,9 @@
   const searchbarEl = document.querySelector('.searchbar');
   const scrollAnchorEl = document.getElementById('scrollAnchor');
   const vv = window.visualViewport;
-  let pinned=false, closing=false;
+  // restOff = the offsetTop the bar was pinned AT while the viewport sat still. Once the live
+  // offsetTop leaves it, the viewport has started panning — see trackTop.
+  let pinned=false, closing=false, restOff=0;
   const goSticky = ()=>{
     if(!pinned) return;
     pinned=false; closing=false;
@@ -597,6 +599,7 @@
       searchbarEl.classList.add('pinned');
     }
     closing=false;
+    restOff = t;
     searchbarEl.style.top = t+'px';
     // Start the tracking loop on EVERY pin, not just the unpinned->pinned transition. A pin
     // that arrived while the loop was stopped (re-pinning during a bounce) otherwise left the
@@ -611,16 +614,26 @@
   // offsetTop both unchanged). During the close the correct top is 0. Hold it there until the
   // keyboard is fully gone, then hand to plain sticky.
   searchInput.addEventListener('blur', ()=>{ if(pinned){ closing=true; searchbarEl.style.top='0px'; } });
-  let trackRaf=0;
+  let trackRaf=0, lastOff=-1, stillFrames=0;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
+    const off=Math.max(0,Math.round(vv.offsetTop));
+    if(off===lastOff) stillFrames++; else { stillFrames=0; lastOff=off; }
     if(closing){
-      searchbarEl.style.top='0px';                                   // fixed is visual-relative now
-      if(!keyboardUp() && Math.round(vv.offsetTop)===0){ goSticky(); trackRaf=0; return; }
+      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
+      // The hold is only right WHILE the viewport is panning. If the pan settles with the
+      // keyboard still up — an OPENING pan, or a dismiss iOS changed its mind about — fixed
+      // goes back to layout-relative, where flush is top:=offsetTop, not top:0. Without this
+      // release the bar stayed parked a full offsetTop above the screen for as long as the
+      // keyboard was up (measured -337 across 161 frames).
+      if(keyboardUp() && stillFrames>=3){
+        closing=false; restOff=off; searchbarEl.style.top=off+'px';
+      } else {
+        searchbarEl.style.top='0px';                                 // fixed is visual-relative now
+      }
       trackRaf=requestAnimationFrame(trackTop);
       return;
     }
-    const off=Math.max(0,Math.round(vv.offsetTop));
     // Unpin to plain sticky only once the keyboard has FULLY closed (height restored), not
     // the instant offsetTop first reads 0 — during the close offsetTop briefly hits 0 while
     // the height is still shrunk, and unpinning there left the bar sticky mid-close, which
@@ -629,6 +642,18 @@
     // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
     // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
     if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
+    // offsetTop has left its resting value => the viewport has STARTED panning: the keyboard
+    // is being dragged away by iOS's native scroll-to-dismiss (or is closing). iOS switches
+    // fixed to VISUAL-relative the instant a pan begins, so the flush position becomes a
+    // static top:0 — and a static value is the whole point: the compositor then carries the
+    // bar, instead of JS rewriting top every frame and landing a frame behind (that lag was
+    // the bounce). Same hold the bottom rubber-band uses. Flip only once the pan is REAL,
+    // never on touch: doing it while the keyboard still sat stable-up (fixed still
+    // layout-relative) put top:0 a full offsetTop ABOVE the screen, measured at -382.
+    if(restOff>0 && Math.abs(off-restOff)>2){
+      closing=true; searchbarEl.style.top='0px';
+      trackRaf=requestAnimationFrame(trackTop); return;
+    }
     if(searchbarEl.style.top!==off+'px') searchbarEl.style.top=off+'px';
     trackRaf=requestAnimationFrame(trackTop);
   };
