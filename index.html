@@ -635,12 +635,26 @@
   // work: at close start off is still ~restOff, so the flip fires late and the bar renders
   // restOff px down = mid-screen (seen on video during a swipe-dismiss). The release below
   // covers the case where the close does not actually follow.
-  searchInput.addEventListener('blur', ()=>{ if(pinned){ closing=true; searchbarEl.style.top=naturalTop()+'px'; } });
+  searchInput.addEventListener('blur', ()=>{
+    // Pin if we are not already: the bar is now left plain sticky whenever its flow slot is on
+    // screen, so a dismiss can start from the unpinned state — and iOS breaks sticky on the
+    // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
+    // so set it after.
+    if(!pinned) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+    closing=true; searchbarEl.style.top=naturalTop()+'px';
+  });
   let trackRaf=0, lastOff=-1, stillFrames=0;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
     const off=Math.max(0,Math.round(vv.offsetTop));
     if(off===lastOff) stillFrames++; else { stillFrames=0; lastOff=off; }
+    // Slot back on screen (scrolling UP toward the header): the bar belongs in the flow, and
+    // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
+    // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
+    // a chase, and a chase always lands a frame late: that was the jitter when sliding up.
+    // So hand it back and go static. Not while `closing` — iOS breaks sticky mid keyboard
+    // close, which is the whole reason the pin exists.
+    if(!closing && naturalTop() > 0){ goSticky(); trackRaf=0; return; }
     // Two different reasons to hold top:0, with different exits — conflating them broke both.
     // `closing`: a blur fired, the keyboard is on its way out. Hold until it is fully gone. It
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
@@ -725,7 +739,10 @@
       // sticky in exactly that case, and iOS breaks sticky on the root scroller while the
       // keyboard closes, dropping the bar mid-screen. Pinned at top:=offsetTop it is in the
       // right place either way, and blur can then hold it at top:0 through the close.
-      if(keyboardUp()) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
+      // ...but only once the flow slot is scrolled past. If the slot is still on screen the
+      // bar's correct place IS its flow position, which sticky gives natively — pinning there
+      // means chasing it per frame, which jitters.
+      if(keyboardUp() && naturalTop()===0) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
@@ -744,6 +761,9 @@
       // rect API answers in LAYOUT coordinates during a pan. Trust the video, not the rect.
       // Then reuse the `closing` hold: keep top:0 until the pan unwinds, then hand to sticky.
       if(!closing && !keyboardUp() && Math.round(vv.offsetTop) > 0){ pinFixed(0); closing=true; }
+      // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
+      // bar to sticky whenever the slot is visible, so this is the other half of that swap.
+      else if(!pinned && keyboardUp() && naturalTop()===0) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
@@ -754,7 +774,7 @@
     // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
     // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
     window.addEventListener('scroll', ()=>{
-      if(pinned || settleTimer || Math.round(vv.offsetTop) > 0) onChange();
+      if(pinned || settleTimer || keyboardUp() || Math.round(vv.offsetTop) > 0) onChange();
     }, {passive:true});
   }
 
