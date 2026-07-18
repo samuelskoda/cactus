@@ -550,28 +550,29 @@
   filterToggle.addEventListener('click', ()=>{ filterPanel.classList.contains('open') ? closePanel() : openPanel(); });
   document.addEventListener('click', e=>{ if(!searchRow.contains(e.target)) closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-  // Dismiss the keyboard on touchSTART (finger lands), not touchmove (finger already
-  // dragging). sticky breaks on the root scroller while the keyboard is mid-close, so the
-  // close must overlap the scroll as little as possible: blurring at touchstart starts the
-  // close on a STILL page, before any scrolling — the same reason a deliberate tap outside
-  // never flickers. It also gives standard iOS behavior: touching anywhere outside the
-  // search row dismisses the keyboard. Touches inside the row (the field, ×, Filter) are
-  // excluded so using them doesn't close it.
+  // Dismissing the keyboard: distinguish a TAP outside from a SWIPE, and treat them opposite.
+  //  - A tap outside the search row  -> blur (programmatic close on a still page). This is the
+  //    clean path: no scroll overlaps it, so trackTop's `closing` branch holds the bar at top:0
+  //    through the whole close with no thrash.
+  //  - A swipe                        -> do NOT blur. Let iOS run its native scroll-to-dismiss:
+  //    the keyboard pans down as the page scrolls, offsetTop animates smoothly, and trackTop
+  //    keeps the bar pinned to offsetTop the whole way. ONE gesture dismisses AND scrolls.
+  // We used to blur on touchstart (before knowing tap vs swipe) and block the scroll — that
+  // forced a programmatic close to overlap the scroll, which thrashed offsetTop and flung the
+  // bar off-screen. Deciding at touchEND (did the finger move?) avoids that entirely.
   const searchRowEl = document.getElementById('searchRow');
+  let tStartY=0, tMoved=false, tOutside=false;
   document.addEventListener('touchstart', e=>{
-    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
-      searchInput.blur();
-    }
+    tOutside = (document.activeElement === searchInput && !searchRowEl.contains(e.target));
+    tStartY = e.touches[0] ? e.touches[0].clientY : 0;
+    tMoved = false;
   }, {passive:true});
-  // BLOCK scrolling while the keyboard is up or still closing. The flicker was the scroll
-  // overlapping the keyboard-close viewport thrash (offsetTop swinging 0<->-345). Preventing
-  // the scroll until the keyboard is fully gone means the close happens on a STILL page (like
-  // pressing Done / tapping outside — which never flickered) and the scroll only begins
-  // afterward, with no overlap. The touchstart above dismisses the keyboard, so a swipe
-  // reads as: first dismiss the keyboard (page held still), then scroll.
   document.addEventListener('touchmove', e=>{
-    if(keyboardUp() && e.cancelable) e.preventDefault();
-  }, {passive:false});
+    if(e.touches[0] && Math.abs(e.touches[0].clientY - tStartY) > 8) tMoved = true;
+  }, {passive:true});
+  document.addEventListener('touchend', ()=>{
+    if(tOutside && !tMoved) searchInput.blur();   // a tap outside dismisses; a swipe is left to iOS
+  }, {passive:true});
 
   // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
   // rubber — the content slides on the compositor and JS always follows a frame late).
