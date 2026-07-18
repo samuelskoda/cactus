@@ -152,12 +152,26 @@
   body.noscroll{overflow:hidden}
   .sheet{position:relative;background:var(--panel);border-radius:16px;max-width:900px;width:100%;
     margin:auto;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1fr}
-  .sheet img{width:100%;height:100%;max-height:80vh;object-fit:cover;background:var(--sand)}
   .sheet .info{padding:26px 26px 30px;position:relative}
-  .sheet .photo{position:relative;height:100%}
+  /* ONE box for the whole photo set. Its height comes from a spacer sized by the FIRST photo's
+     aspect ratio (--ar, set in JS), and every photo is absolutely positioned to fill it. The
+     box used to be sized by the current <img> itself, so stepping to a photo with different
+     dimensions resized the whole sheet. --ar is a fallback until the first photo reports its
+     size; overflow:hidden keeps the spacer from pushing past the max-height cap. */
+  .sheet .photo{position:relative;height:100%;max-height:80vh;overflow:hidden;--ar:.75}
+  .sheet .photo::before{content:'';display:block;padding-top:calc(var(--ar) * 100%)}
+  .sheet .photo img{position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;background:var(--sand)}
   .photo .nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;
     border:none;border-radius:50%;background:rgba(20,18,12,.5);color:#fff;
     font-size:1.5rem;line-height:1;cursor:pointer;padding:0}
+  /* Hover affordance on the arrows — pointer devices only, so it can't stick after a tap. */
+  @media (hover:hover){
+    .photo .nav{opacity:.6;transition:opacity .15s ease, background-color .15s ease, transform .15s ease}
+    .photo:hover .nav{opacity:.9}
+    .photo .nav:hover{opacity:1;background:rgba(20,18,12,.78);transform:translateY(-50%) scale(1.12)}
+    .photo .nav:active{transform:translateY(-50%) scale(1.02)}
+  }
   .photo .nav.prev{left:10px}
   .photo .nav.next{right:10px}
   .photo .pcount{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
@@ -183,7 +197,7 @@
   .qr code{background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:5px}
   @media (max-width:640px){
     .sheet{grid-template-columns:1fr}
-    .sheet img{max-height:44vh}
+    .sheet .photo{max-height:44vh}
     .close{position:fixed;top:6px;right:14px;width:44px;height:44px;border-radius:50%;padding:0;
       background:rgba(20,18,12,.55);color:#fff;font-size:1.7rem;display:flex;align-items:center;justify-content:center}
   }
@@ -515,6 +529,18 @@
     sheet.querySelectorAll('[data-region]').forEach(el=>{ el.onclick=()=>applyFilter('region', el.dataset.region); });
     sheet.querySelectorAll('[data-tentative]').forEach(el=>{ el.onclick=()=>applyFilter('tentative'); });
     sheet.querySelectorAll('[data-goto]').forEach(el=>{ el.onclick=e=>{ e.preventDefault(); openModal(el.dataset.goto); }; });
+    // Lock the photo box to the FIRST photo's shape, so stepping through a set whose photos have
+    // different dimensions never resizes the sheet. Done for single photos too, so the box is
+    // always driven by the spacer rather than by the <img>.
+    {
+      const photoEl=sheet.querySelector('.photo'), first=sheet.querySelector('.photo img');
+      const lockRatio=()=>{
+        if(first.naturalWidth && first.naturalHeight)
+          photoEl.style.setProperty('--ar', (first.naturalHeight/first.naturalWidth).toFixed(4));
+      };
+      // Only ever measures the first photo: the listener is spent before any switch can happen.
+      if(first.complete) lockRatio(); else first.addEventListener('load', lockRatio, {once:true});
+    }
     if(files.length>1){
       let i=0;
       const img=sheet.querySelector('.photo img'), pcount=sheet.querySelector('.pcount');
@@ -527,6 +553,21 @@
       };
       prev.onclick=()=>show(i-1);
       next.onclick=()=>show(i+1);
+      // Swipe left/right across the photo to step through the set. Listeners stay passive so a
+      // vertical drag still scrolls the sheet; a swipe only counts when it is clearly sideways,
+      // which is what keeps it from stealing that scroll.
+      const photoEl=sheet.querySelector('.photo');
+      let sx=0, sy=0, tracking=false;
+      photoEl.addEventListener('touchstart', e=>{
+        if(e.touches.length!==1){ tracking=false; return; }
+        sx=e.touches[0].clientX; sy=e.touches[0].clientY; tracking=true;
+      }, {passive:true});
+      photoEl.addEventListener('touchend', e=>{
+        if(!tracking) return;
+        tracking=false;
+        const t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy;
+        if(Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)*1.5) show(dx<0 ? i+1 : i-1);
+      }, {passive:true});
     }
   }
   function closeModal(){ modal.classList.remove('open'); document.body.classList.remove('noscroll'); if(location.hash) history.replaceState(null,'',location.pathname); }
