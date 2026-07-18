@@ -125,7 +125,11 @@
   .count{color:var(--muted);font-size:.85rem;margin:0 0 14px}
   /* overflow-anchor:none stops the browser from "correcting" scroll position on its
      own when we wipe and rebuild every card — that fight is what broke scrollToResults() */
+  /* auto-fill would pack 4+ narrow columns on a wide screen, and a long binomial like
+     "Coryphantha elephantidens" then wrapped its flower marker onto a line of its own.
+     Capping at 3 keeps every card wide enough for the longest name in the collection. */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-bottom:60px;overflow-anchor:none}
+  @media (min-width:760px){ .grid{grid-template-columns:repeat(3,1fr)} }
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column}
   /* display:flex above would otherwise beat the hidden attribute */
@@ -165,17 +169,26 @@
      size; overflow:hidden keeps the spacer from pushing past the max-height cap. */
   .sheet .photo{position:relative;height:100%;max-height:80vh;overflow:hidden;--ar:.75}
   .sheet .photo::before{content:'';display:block;padding-top:calc(var(--ar) * 100%)}
+  /* Every photo of the set is rendered as a stacked layer and we cross-fade between them,
+     rather than swapping one <img>'s src — a swap blanks the element while the new file
+     decodes. The slide is small and follows the swipe direction, so the motion reads as
+     "the next photo came from that side". */
   .sheet .photo img{position:absolute;inset:0;width:100%;height:100%;
-    object-fit:cover;background:var(--sand)}
+    object-fit:cover;background:var(--sand);
+    opacity:0;transform:translateX(0);pointer-events:none;
+    transition:opacity .26s ease, transform .26s ease}
+  .sheet .photo img.on{opacity:1;transform:none;pointer-events:auto}
+  @media (prefers-reduced-motion:reduce){
+    .sheet .photo img{transition:opacity .12s ease;transform:none !important}
+  }
   .photo .nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;
     border:none;border-radius:50%;background:rgba(20,18,12,.5);color:#fff;
     font-size:1.5rem;line-height:1;cursor:pointer;padding:0}
   /* Hover affordance on the arrows — pointer devices only, so it can't stick after a tap. */
   @media (hover:hover){
-    .photo .nav{opacity:.6;transition:opacity .15s ease, background-color .15s ease, transform .15s ease}
+    .photo .nav{opacity:.6;transition:opacity .15s ease, background-color .15s ease}
     .photo:hover .nav{opacity:.9}
-    .photo .nav:hover{opacity:1;background:rgba(20,18,12,.78);transform:translateY(-50%) scale(1.12)}
-    .photo .nav:active{transform:translateY(-50%) scale(1.02)}
+    .photo .nav:hover{opacity:1;background:rgba(20,18,12,.82)}
   }
   .photo .nav.prev{left:10px}
   .photo .nav.next{right:10px}
@@ -187,7 +200,9 @@
   .sheet .tags{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
   /* card marker: the plant has a photo of it in flower. Sits with the name, not as a badge,
      so it reads as part of the title rather than as another filter chip. */
-  .bloom{font-size:.85em;margin-left:.15em;vertical-align:baseline;line-height:1}
+  /* Glued to the preceding word: on its own it could wrap to a line by itself, which read
+     as a stray icon under the name. The name may still wrap; the marker rides the last word. */
+  .bloom{font-size:.85em;vertical-align:baseline;line-height:1;white-space:nowrap}
   .badge.click{cursor:pointer}
   .badge.click:hover{opacity:.78}
   .kv{margin:14px 0;border-top:1px solid var(--line);padding-top:14px}
@@ -324,7 +339,8 @@
     t.onclick=()=>selectFilter('tentative');
     el.appendChild(t);
     const f=document.createElement('button');
-    f.className='chip c-flower'; f.textContent='🌸 In flower'; f.dataset.other='flower';
+    f.className='chip c-flower'; f.textContent='🌸'; f.dataset.other='flower';
+    f.title='In flower'; f.setAttribute('aria-label','In flower');
     f.onclick=()=>selectFilter('flower');
     el.appendChild(f);
   }
@@ -360,7 +376,7 @@
     return `<article class="card" data-id="${escAttr(d.id)}" onclick="openModal('${d.id}')">
       <div class="thumb"><img loading="lazy" src="${d.file}" alt="${d.name}"></div>
       <div class="body">
-        <p class="sci${isMixed(d)?' plain':''}">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}${d.flower?'<span class="bloom" title="Photographed in flower" aria-label="Photographed in flower">🌸</span>':''}</p>
+        <p class="sci${isMixed(d)?' plain':''}">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}${d.flower?'&nbsp;<span class="bloom" title="Photographed in flower" aria-label="Photographed in flower">🌸</span>':''}</p>
         <div class="meta"><span>${d.origin}</span></div>
       </div>
     </article>`;
@@ -523,7 +539,7 @@
     const files = (d.files && d.files.length) ? d.files : [d.file];
     sheet.innerHTML=`
       <div class="photo">
-        <img src="${files[0]}" alt="${d.name}">
+        ${files.map((f,k)=>`<img src="${f}" alt="${escAttr(d.name)}"${k===0?' class="on"':''}>`).join('')}
         ${files.length>1?`
         <button class="nav prev" aria-label="Previous photo" hidden>‹</button>
         <button class="nav next" aria-label="Next photo">›</button>
@@ -560,11 +576,37 @@
     }
     if(files.length>1){
       let i=0;
-      const img=sheet.querySelector('.photo img'), pcount=sheet.querySelector('.pcount');
+      const photoEl=sheet.querySelector('.photo');
+      const imgs=[...photoEl.querySelectorAll('img')], pcount=sheet.querySelector('.pcount');
       const prev=sheet.querySelector('.nav.prev'), next=sheet.querySelector('.nav.next');
+      const SLIDE=6;   // % of the box the layers travel; enough to read as motion, not a lurch
       const show=n=>{
+        const from=i;
         i=Math.max(0, Math.min(files.length-1, n));   // no wrap-around: ends are ends
-        img.src=files[i]; pcount.textContent=`${i+1} / ${files.length}`;
+        if(i!==from){
+          const dir = i>from ? 1 : -1;               // +1 = moving forward through the set
+          // Only the ARRIVING layer animates, and it does so on top of the one it replaces,
+          // which simply stays put and opaque underneath. Fading the outgoing one out as well
+          // left a gap mid-transition where neither layer was solid and the panel background
+          // showed through, so the photo appeared to fade up out of nothing rather than to
+          // replace what was there. Whichever layer is topmost and opaque wins, so the ones
+          // below need no cleanup.
+          imgs.forEach((im,k)=>{
+            im.style.zIndex = k===i ? '2' : (k===from ? '1' : '0');
+            if(k!==i){ im.style.transform=''; return; }
+            // Park it offset on the side it is arriving from with transitions suppressed, then
+            // flush layout so the move to its resting place actually animates — without the
+            // flush the browser coalesces both writes and the layer just appears.
+            im.style.transition='none';
+            im.style.transform=`translateX(${dir*SLIDE}%)`;
+            im.classList.remove('on');
+            void im.offsetWidth;
+            im.style.transition='';
+            im.style.transform='';
+            im.classList.add('on');
+          });
+        }
+        pcount.textContent=`${i+1} / ${files.length}`;
         prev.hidden = i===0;
         next.hidden = i===files.length-1;
       };
@@ -573,7 +615,6 @@
       // Swipe left/right across the photo to step through the set. Listeners stay passive so a
       // vertical drag still scrolls the sheet; a swipe only counts when it is clearly sideways,
       // which is what keeps it from stealing that scroll.
-      const photoEl=sheet.querySelector('.photo');
       let sx=0, sy=0, tracking=false;
       photoEl.addEventListener('touchstart', e=>{
         if(e.touches.length!==1){ tracking=false; return; }
