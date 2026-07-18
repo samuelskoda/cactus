@@ -595,10 +595,13 @@
       pinned=true;
       scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
       searchbarEl.classList.add('pinned');
-      if(!trackRaf) trackRaf=requestAnimationFrame(trackTop);
     }
     closing=false;
     searchbarEl.style.top = t+'px';
+    // Start the tracking loop on EVERY pin, not just the unpinned->pinned transition. A pin
+    // that arrived while the loop was stopped (re-pinning during a bounce) otherwise left the
+    // bar frozen at whatever top it was given, so it stopped following the pan.
+    if(!trackRaf) trackRaf=requestAnimationFrame(trackTop);
   };
   // The blur (keyboard dismiss) starts the close. CRUCIAL iOS quirk: while the keyboard is
   // stable-up, a fixed element is positioned relative to the LAYOUT viewport, so top:offsetTop
@@ -623,6 +626,8 @@
     // the height is still shrunk, and unpinning there left the bar sticky mid-close, which
     // mispositioned it to mid-screen. Scrolling is blocked while the keyboard is up, so
     // holding the fixed pin through the whole close is safe (no scroll to drift against).
+    // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
+    // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
     if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
     if(searchbarEl.style.top!==off+'px') searchbarEl.style.top=off+'px';
     trackRaf=requestAnimationFrame(trackTop);
@@ -654,25 +659,30 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
+      // A viewport pan with NO keyboard is a rubber-band bounce (the bottom one stretches
+      // offsetTop to ~215 and eases it back). Sticky slides away with the content during it,
+      // so pin and track the pan — top:=offsetTop holds the bar flush the whole bounce.
+      // Detecting it by offsetTop rather than by "scrolled past the end" matters: pinning
+      // swaps the bar out of flow for #scrollAnchor, which moves the page's own end, so a
+      // scrollY-vs-scrollHeight test flips false mid-bounce and drops the tracking.
+      // Pin at top:0, NOT top:=offsetTop. During a pan iOS positions fixed relative to the
+      // VISUAL viewport, so top:0 is flush at the visible top — the same rule as the keyboard
+      // close. top:=offsetTop instead pushed the bar offsetTop px DOWN the screen (~530px,
+      // clearly mid-screen on video) while getBoundingClientRect still reported 0, because the
+      // rect API answers in LAYOUT coordinates during a pan. Trust the video, not the rect.
+      // Then reuse the `closing` hold: keep top:0 until the pan unwinds, then hand to sticky.
+      if(!closing && !keyboardUp() && Math.round(vv.offsetTop) > 0){ pinFixed(0); closing=true; }
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
     }
     vv.addEventListener('resize', onChange);
     vv.addEventListener('scroll', onChange);
-    const maxScrollY = ()=> document.documentElement.scrollHeight - window.innerHeight;
     // Ordinary page scrolling fires neither vv event, so without this the settle timer
     // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
     // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
     window.addEventListener('scroll', ()=>{
-      if(!keyboardUp() && window.scrollY > maxScrollY()+1){
-        // Bottom rubber-band: iOS detaches sticky during the bounce (the bar slid away
-        // with the content even with no keyboard involved). A fixed element doesn't
-        // bounce, and fixed;top:0 is the exact visual spot the stuck bar occupies, so the
-        // pin is invisible — it just holds the bar still until the bounce settles.
-        pinFixed(0);
-        arm();
-      } else if(pinned || settleTimer) onChange();
+      if(pinned || settleTimer || Math.round(vv.offsetTop) > 0) onChange();
     }, {passive:true});
   }
 
