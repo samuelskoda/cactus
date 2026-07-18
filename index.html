@@ -107,16 +107,19 @@
   .chip.c-genus    {background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 32%,transparent)}
   .chip.c-mixed    {background:#dbe7f6;color:#345d92;border-color:#bcd0ea}
   .chip.c-tentative{background:#f4e7c9;color:#8a6d1f;border-color:#e6d199}
+  .chip.c-flower   {background:#f7e0ec;color:#a33a6e;border-color:#eec4d9}
   .chip:hover{opacity:.8}
   .chip.on{color:#fff}
   .chip.c-region.on   {background:#6b665b;border-color:#6b665b;color:#fff}
   .chip.c-genus.on    {background:var(--accent);border-color:var(--accent);color:#fff}
   .chip.c-mixed.on    {background:#3a6aa5;border-color:#3a6aa5;color:#fff}
   .chip.c-tentative.on{background:#b8901f;border-color:#b8901f;color:#fff}
+  .chip.c-flower.on   {background:#b8437e;border-color:#b8437e;color:#fff}
   @media (prefers-color-scheme:dark){
     .chip.c-region{background:#33302a;color:#b7b0a2;border-color:#464036}
     .chip.c-mixed {background:#26313f;color:#8fb2df;border-color:#3c4c64}
     .chip.c-tentative{background:#3a3320;color:#d8b95a;border-color:#5a4e28}
+    .chip.c-flower   {background:#3a2430;color:#e59bc0;border-color:#5c3549}
   }
 
   .count{color:var(--muted);font-size:.85rem;margin:0 0 14px}
@@ -138,10 +141,12 @@
   .badge.q{background:#f4e7c9;color:#8a6d1f;border-color:#e6d199}
   .badge.m{background:#dbe7f6;color:#345d92;border-color:#bcd0ea}
   .badge.r{background:#e6e3dc;color:#5a564d;border-color:#d2cdc2}
+  .badge.f{background:#f7e0ec;color:#a33a6e;border-color:#eec4d9}
   @media (prefers-color-scheme:dark){
     .badge.q{background:#3a3320;color:#d8b95a;border-color:#5a4e28}
     .badge.m{background:#26313f;color:#8fb2df;border-color:#3c4c64}
     .badge.r{background:#33302a;color:#b7b0a2;border-color:#464036}
+    .badge.f{background:#3a2430;color:#e59bc0;border-color:#5c3549}
   }
 
   /* modal */
@@ -180,6 +185,9 @@
   .sheet h2.plain{font-style:normal}
   .sheet .tagline{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
   .sheet .tags{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+  /* card marker: the plant has a photo of it in flower. Sits with the name, not as a badge,
+     so it reads as part of the title rather than as another filter chip. */
+  .bloom{font-size:.85em;margin-left:.15em;vertical-align:baseline;line-height:1}
   .badge.click{cursor:pointer}
   .badge.click:hover{opacity:.78}
   .kv{margin:14px 0;border-top:1px solid var(--line);padding-top:14px}
@@ -266,12 +274,12 @@
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
      index.html — a stale data.js here previously broke photo paths and clicks -->
-<script src="data.js?v=3"></script>
+<script src="data.js?v=4"></script>
 <script>
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
   const grid = document.getElementById('grid');
-  const state = { q:"", region:null, genus:null, tentative:false };
+  const state = { q:"", region:null, genus:null, tentative:false, flower:false };
 
   const uniq = (arr)=>[...new Set(arr)];
   const asArr = (v)=>Array.isArray(v)?v:[v];      // tolerate old string-valued entries
@@ -315,6 +323,10 @@
     t.className='chip c-tentative'; t.textContent='Tentative'; t.dataset.other='tentative';
     t.onclick=()=>selectFilter('tentative');
     el.appendChild(t);
+    const f=document.createElement('button');
+    f.className='chip c-flower'; f.textContent='🌸 In flower'; f.dataset.other='flower';
+    f.onclick=()=>selectFilter('flower');
+    el.appendChild(f);
   }
 
   function syncChips(){
@@ -322,6 +334,7 @@
     document.querySelectorAll('#genusFacet .chip').forEach(c=>c.classList.toggle('on',c.dataset.val===state.genus));
     const mix=document.querySelector('#otherFacet .chip[data-other="mixed"]'); if(mix) mix.classList.toggle('on', state.genus===SPECIAL);
     const ten=document.querySelector('#otherFacet .chip[data-other="tentative"]'); if(ten) ten.classList.toggle('on', !!state.tentative);
+    const flw=document.querySelector('#otherFacet .chip[data-other="flower"]'); if(flw) flw.classList.toggle('on', !!state.flower);
   }
 
   document.getElementById('q').addEventListener('input', e=>{
@@ -336,6 +349,7 @@
     if(state.region && !asArr(d.region).includes(state.region)) return false;
     if(state.genus  && !asArr(d.genus).includes(state.genus))   return false;
     if(state.tentative && !d.uncertain) return false;
+    if(state.flower && !d.flower) return false;
     if(state.q){
       const hay=(d.name+' '+d.tag+' '+asArr(d.genus).join(' ')+' '+asArr(d.region).join(' ')+' '+d.origin+' '+d.blurb).toLowerCase();
       if(!hay.includes(state.q)) return false;
@@ -346,7 +360,7 @@
     return `<article class="card" data-id="${escAttr(d.id)}" onclick="openModal('${d.id}')">
       <div class="thumb"><img loading="lazy" src="${d.file}" alt="${d.name}"></div>
       <div class="body">
-        <p class="sci${isMixed(d)?' plain':''}">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}</p>
+        <p class="sci${isMixed(d)?' plain':''}">${d.name} ${d.uncertain?'<span class="badge q">?</span>':''}${d.flower?'<span class="bloom" title="Photographed in flower" aria-label="Photographed in flower">🌸</span>':''}</p>
         <div class="meta"><span>${d.origin}</span></div>
       </div>
     </article>`;
@@ -384,8 +398,8 @@
     emptyMsgEl.hidden = shown>0;
     document.getElementById('count').textContent =
       `${shown} of ${data.length} plants` +
-      (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'') + (state.tentative?' · Tentative':'');
-    document.getElementById('filterToggle').classList.toggle('active', !!(state.region||state.genus||state.tentative));
+      (state.region?` · ${state.region}`:'') + (state.genus?` · ${state.genus}`:'') + (state.tentative?' · Tentative':'') + (state.flower?' · In flower':'');
+    document.getElementById('filterToggle').classList.toggle('active', !!(state.region||state.genus||state.tentative||state.flower));
 
     // Only grow further here (rare — the worst-case estimate above already
     // covers a normal shrink); never shrink immediately. Shrinking back down
@@ -446,17 +460,18 @@
       return url ? `<a href="${url}" target="_blank" rel="noopener"><em>${s}</em></a>` : s;
     }).join(' · ');
   }
-  // all filter tags on one line, ordered: blue Mixed, grey Region, green Genus, yellow tentative
+  // all filter tags on one line, ordered: blue Mixed, grey Region, green Genus, yellow tentative, pink in-flower
   function allTags(d){
     const genera = asArr(d.genus);
     const blue   = genera.filter(g=>g===SPECIAL).map(g=>`<span class="badge m click" data-genus="${escAttr(g)}">${g}</span>`);
     const grey   = asArr(d.region).map(r=>`<span class="badge r click" data-region="${escAttr(r)}">${r}</span>`);
     const green  = genera.filter(g=>g!==SPECIAL).map(g=>`<span class="badge click" data-genus="${escAttr(g)}">${g}</span>`);
     const yellow = d.uncertain ? ['<span class="badge q click" data-tentative="1">Tentative</span>'] : [];
-    return [...blue, ...grey, ...green, ...yellow].join(' ');
+    const pink   = d.flower ? ['<span class="badge f click" data-flower="1">🌸 In flower</span>'] : [];
+    return [...blue, ...grey, ...green, ...yellow, ...pink].join(' ');
   }
   // only one filter may be active at a time
-  function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; }
+  function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; state.flower=false; }
   // scroll so the sticky search bar sits at the top with the first result just below it
   function scrollToResults(instant){
     const anchor=document.getElementById('scrollAnchor');
@@ -473,8 +488,9 @@
     setTimeout(doScroll, 120);
   }
   // menu chips: toggle this filter (clearing the others), then close the dropdown
+  const BOOL_FILTER = new Set(['tentative','flower']);   // toggles, not values
   function selectFilter(key, value){
-    const target = key==='tentative' ? true : value;
+    const target = BOOL_FILTER.has(key) ? true : value;
     const wasActive = state[key] === target;
     clearFilters();
     if(!wasActive) state[key] = target;
@@ -485,7 +501,7 @@
   // modal tags: make this the only active filter, then close
   function applyFilter(key, value){
     clearFilters();
-    state[key] = key==='tentative' ? true : value;
+    state[key] = BOOL_FILTER.has(key) ? true : value;
     syncChips(); render(); closeModal();
     scrollToResults();
   }
@@ -522,12 +538,13 @@
           <div><span class="k">Species</span><span>${speciesCell(d)}</span></div>
           <div><span class="k">Genus</span><span>${genusLinks(d)}</span></div>
           <div><span class="k">Origin</span><span>${d.origin}</span></div>
-          <div><span class="k">Number</span><span>#${numberOf(d)}</span></div>
+          <div><span class="k">Catalog #</span><span>${numberOf(d)}</span></div>
         </div>
       </div>`;
     sheet.querySelectorAll('[data-genus]').forEach(el=>{ el.onclick=()=>applyFilter('genus', el.dataset.genus); });
     sheet.querySelectorAll('[data-region]').forEach(el=>{ el.onclick=()=>applyFilter('region', el.dataset.region); });
     sheet.querySelectorAll('[data-tentative]').forEach(el=>{ el.onclick=()=>applyFilter('tentative'); });
+    sheet.querySelectorAll('[data-flower]').forEach(el=>{ el.onclick=()=>applyFilter('flower'); });
     sheet.querySelectorAll('[data-goto]').forEach(el=>{ el.onclick=e=>{ e.preventDefault(); openModal(el.dataset.goto); }; });
     // Lock the photo box to the FIRST photo's shape, so stepping through a set whose photos have
     // different dimensions never resizes the sheet. Done for single photos too, so the box is
