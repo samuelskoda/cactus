@@ -433,7 +433,7 @@
     }
     const t=document.createElement('button');
     t.className='chip c-tentative'; t.dataset.other='tentative';
-    t.textContent='? '+I18N[lang].tentative;
+    t.textContent='❓ '+I18N[lang].tentative;
     t.onclick=()=>selectFilter('tentative');
     el.appendChild(t);
     const f=document.createElement('button');
@@ -585,7 +585,7 @@
     const blue   = genera.filter(g=>g===SPECIAL).map(g=>`<span class="badge m click" data-genus="${escAttr(g)}">🔀 ${genusLabel(g)}</span>`);
     const grey   = asArr(d.region).map(r=>`<span class="badge r click" data-region="${escAttr(r)}">${regionLabel(r)}</span>`);
     const green  = genera.filter(g=>g!==SPECIAL).map(g=>`<span class="badge click" data-genus="${escAttr(g)}">${g}</span>`);
-    const yellow = d.uncertain ? [`<span class="badge q click" data-tentative="1">? ${t('tentative')}</span>`] : [];
+    const yellow = d.uncertain ? [`<span class="badge q click" data-tentative="1">❓ ${t('tentative')}</span>`] : [];
     const pink   = d.flower ? [`<span class="badge f click" data-flower="1">🌸 ${t('inFlower')}</span>`] : [];
     return [...blue, ...grey, ...green, ...yellow, ...pink].join(' ');
   }
@@ -1109,7 +1109,7 @@
     document.querySelectorAll('#regionFacet .chip').forEach(c=>{ c.textContent = regionLabel(c.dataset.val); });
     document.querySelectorAll('#genusFacet .chip').forEach(c=>{ c.textContent = genusLabel(c.dataset.val); });
     const mix=document.querySelector('#otherFacet .chip[data-other="mixed"]'); if(mix) mix.textContent = '🔀 '+genusLabel(SPECIAL);
-    const ten=document.querySelector('#otherFacet .chip[data-other="tentative"]'); if(ten) ten.textContent = '? '+L.tentative;
+    const ten=document.querySelector('#otherFacet .chip[data-other="tentative"]'); if(ten) ten.textContent = '❓ '+L.tentative;
     const flw=document.querySelector('#otherFacet .chip[data-other="flower"]');
     if(flw) flw.textContent = '🌸 '+L.inFlower;
     emptyMsgEl.textContent = L.noMatch;
