@@ -582,10 +582,10 @@
   const searchbarEl = document.querySelector('.searchbar');
   const scrollAnchorEl = document.getElementById('scrollAnchor');
   const vv = window.visualViewport;
-  let pinned=false;
+  let pinned=false, closing=false;
   const goSticky = ()=>{
     if(!pinned) return;
-    pinned=false;
+    pinned=false; closing=false;
     searchbarEl.classList.remove('pinned');
     searchbarEl.style.top = '';           // back to the CSS sticky top:0
     scrollAnchorEl.style.height = '0';
@@ -595,8 +595,37 @@
       pinned=true;
       scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
       searchbarEl.classList.add('pinned');
+      if(!trackRaf) trackRaf=requestAnimationFrame(trackTop);
     }
+    closing=false;
     searchbarEl.style.top = t+'px';
+  };
+  // The blur (keyboard dismiss) starts the close. CRUCIAL iOS quirk: while the keyboard is
+  // stable-up, a fixed element is positioned relative to the LAYOUT viewport, so top:offsetTop
+  // lands it at the visible top. But the moment the keyboard starts CLOSING, iOS positions
+  // fixed relative to the (shrinking) VISUAL viewport — so the same top:offsetTop puts the bar
+  // offsetTop px DOWN = mid-screen (measured: barTop jumps 0->300 at close start with top and
+  // offsetTop both unchanged). During the close the correct top is 0. Hold it there until the
+  // keyboard is fully gone, then hand to plain sticky.
+  searchInput.addEventListener('blur', ()=>{ if(pinned){ closing=true; searchbarEl.style.top='0px'; } });
+  let trackRaf=0;
+  const trackTop=()=>{
+    if(!pinned){ trackRaf=0; return; }
+    if(closing){
+      searchbarEl.style.top='0px';                                   // fixed is visual-relative now
+      if(!keyboardUp() && Math.round(vv.offsetTop)===0){ goSticky(); trackRaf=0; return; }
+      trackRaf=requestAnimationFrame(trackTop);
+      return;
+    }
+    const off=Math.max(0,Math.round(vv.offsetTop));
+    // Unpin to plain sticky only once the keyboard has FULLY closed (height restored), not
+    // the instant offsetTop first reads 0 — during the close offsetTop briefly hits 0 while
+    // the height is still shrunk, and unpinning there left the bar sticky mid-close, which
+    // mispositioned it to mid-screen. Scrolling is blocked while the keyboard is up, so
+    // holding the fixed pin through the whole close is safe (no scroll to drift against).
+    if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
+    if(searchbarEl.style.top!==off+'px') searchbarEl.style.top=off+'px';
+    trackRaf=requestAnimationFrame(trackTop);
   };
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
@@ -625,26 +654,8 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      if(pinned){
-        // Keyboard closing (scroll-dismiss) or panning: keep the bar at the visible top
-        // (top:=offsetTop), and hand back to sticky the moment the pan is undone (offsetTop
-        // back to 0) — NOT waiting for the keyboard's height to also restore. iOS defers
-        // that height restore until the scroll ends, so waiting kept the bar position:fixed
-        // for the whole scroll, and iOS drifts a fixed element on the compositor thread as
-        // you scroll — that was the wiggle. At offsetTop 0, sticky(top:0) is the right spot
-        // (never above) and rides the scroll natively instead of drifting.
-        const off = Math.max(0, Math.round(vv.offsetTop));
-        if(off === 0){ goSticky(); }
-        else {
-          // The bar must NEVER sit above its resting spot. Chasing offsetTop 1:1 copied the
-          // compositor's small jitter, which both wiggled the bar and occasionally lifted it
-          // a hair above. So: if offsetTop grew past our top, catch up immediately (that is
-          // the only way the bar could go above); if it merely shrank a little, hold until
-          // it's moved a few px, so sub-pixel jitter can't wiggle it.
-          const cur = parseFloat(searchbarEl.style.top) || 0;
-          if(off > cur || cur - off > 4) searchbarEl.style.top = off + 'px';
-        }
-      }
+      // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
+      // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
     }
     vv.addEventListener('resize', onChange);
