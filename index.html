@@ -587,12 +587,28 @@
       pinned=true;
       scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
       searchbarEl.classList.add('pinned');
+      startTrack();   // keep top glued to offsetTop every frame while pinned
     }
     searchbarEl.style.top = t+'px';
   };
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
   const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
+  // Per-frame tracking: while the keyboard is up, iOS reduces the pan (offsetTop) as you
+  // scroll toward the top, so the pinned bar's top must follow it. Doing that only on
+  // visualViewport events lags between events, and for the lagging frames barTop =
+  // oldTop - newOffsetTop opens a visible GAP above the bar (worst when you reverse the
+  // scroll). A rAF loop sets top=offsetTop every frame instead, so there's no lag to gap.
+  // Safe from the old "rubber": offsetTop now moves smoothly (the keyboard stays up — no
+  // close-thrash), so following it 1:1 per frame is smooth.
+  let trackRaf=0;
+  const trackTop=()=>{
+    if(!pinned){ trackRaf=0; return; }
+    const t=Math.max(0,Math.round(vv.offsetTop));
+    if(searchbarEl.style.top!==t+'px') searchbarEl.style.top=t+'px';
+    trackRaf=requestAnimationFrame(trackTop);
+  };
+  const startTrack=()=>{ if(!trackRaf) trackRaf=requestAnimationFrame(trackTop); };
   if(vv){
     let settleTimer=null, armedScrollY=0;
     function arm(){
