@@ -722,6 +722,26 @@
   });
   render();
 
+  // ---- TEMP live readout (?debug=1) — remove once the top gap is solved.
+  if(/(\?|&)debug=1/.test(location.search)){
+    const bar=document.querySelector('.searchbar'), vvp=window.visualViewport;
+    const box=document.createElement('div');
+    box.style.cssText='position:fixed;top:0;right:0;z-index:99999;background:#000;color:#0f0;'+
+      'font:12px/1.3 ui-monospace,monospace;padding:4px 6px;pointer-events:none;white-space:pre';
+    document.body.appendChild(box);
+    (function tick(){
+      const r=bar.getBoundingClientRect();
+      box.textContent =
+        'barTop '+Math.round(r.top)+'\n'+
+        'top(css) '+(bar.style.top||'0')+'\n'+
+        'offTop '+(vvp?Math.round(vvp.offsetTop):'-')+'\n'+
+        'vvH '+(vvp?Math.round(vvp.height):'-')+' innH '+window.innerHeight+'\n'+
+        'pos '+getComputedStyle(bar).position+'\n'+
+        'sY '+Math.round(window.scrollY);
+      requestAnimationFrame(tick);
+    })();
+  }
+
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
 </script>
