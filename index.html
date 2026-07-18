@@ -558,11 +558,12 @@
   // search row dismisses the keyboard. Touches inside the row (the field, ×, Filter) are
   // excluded so using them doesn't close it.
   const searchRowEl = document.getElementById('searchRow');
-  document.addEventListener('touchstart', e=>{
-    if(document.activeElement === searchInput && !searchRowEl.contains(e.target)){
-      searchInput.blur();
-    }
-  }, {passive:true});
+  // No scroll-dismiss. Measured in the iOS simulator: dismissing the keyboard as the scroll
+  // starts makes iOS hold the shrunk keyboard viewport through the whole scroll while
+  // thrashing offsetTop 0<->negative every frame — and a fixed OR sticky bar rides that and
+  // flies above the viewport and back. That was the flicker (barTop swinging 0..-375). With
+  // the keyboard left up, the viewport stays stable and the pinned bar holds barTop≈0 for
+  // the entire scroll (measured -0.4..0.3). The keyboard closes via its Search key or ×.
 
   // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
   // rubber — the content slides on the compositor and JS always follows a frame late).
@@ -617,24 +618,14 @@
     }
     function onChange(){
       if(pinned){
-        // Keyboard closing (scroll-dismiss) or panning: keep the bar at the visible top
-        // (top:=offsetTop), and hand back to sticky the moment the pan is undone (offsetTop
-        // back to 0) — NOT waiting for the keyboard's height to also restore. iOS defers
-        // that height restore until the scroll ends, so waiting kept the bar position:fixed
-        // for the whole scroll, and iOS drifts a fixed element on the compositor thread as
-        // you scroll — that was the wiggle. At offsetTop 0, sticky(top:0) is the right spot
-        // (never above) and rides the scroll natively instead of drifting.
-        const off = Math.max(0, Math.round(vv.offsetTop));
-        if(off === 0){ goSticky(); }
-        else {
-          // The bar must NEVER sit above its resting spot. Chasing offsetTop 1:1 copied the
-          // compositor's small jitter, which both wiggled the bar and occasionally lifted it
-          // a hair above. So: if offsetTop grew past our top, catch up immediately (that is
-          // the only way the bar could go above); if it merely shrank a little, hold until
-          // it's moved a few px, so sub-pixel jitter can't wiggle it.
-          const cur = parseFloat(searchbarEl.style.top) || 0;
-          if(off > cur || cur - off > 4) searchbarEl.style.top = off + 'px';
-        }
+        // Stay FIXED through the whole keyboard-close scroll; hand back to sticky only when
+        // everything has settled (in onSettled). Measured in the iOS simulator: during a
+        // scroll-dismiss, offsetTop oscillates 0 <-> big-negative every frame while the
+        // keyboard height stays shrunk. If we unpin to sticky, the sticky bar follows those
+        // swings and flies ABOVE the viewport and back each frame — the violent flicker.
+        // A fixed bar clamped to top=max(0,offsetTop) sits at top:0 through the negatives,
+        // which can only ever put it AT or BELOW its spot, never above.
+        searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop)) + 'px';
       }
       arm();
     }
@@ -714,48 +705,6 @@
     trimPadToMinimal();
   });
   render();
-
-  // ---- TEMPORARY diagnostic (?debug=1) — remove once the keyboard misplacement is solved.
-  // Built to NOT mask the bug: the previous overlay repainted a full-frame fixed box every
-  // frame, which forced iOS to keep the layer synced and made the bug vanish. This one only
-  // touches the DOM when it records a NEW WORST position (rare), so it can't paper over the
-  // drift. The rAF loop just READS the bar's rect silently — that alone doesn't mask it.
-  // Reproduce the bug, then read the WORST line + captures at the bottom (tap to select).
-  if(/(\?|&)debug=1/.test(location.search)){
-    const bar=document.querySelector('.searchbar');
-    const vv=window.visualViewport;
-    const box=document.createElement('div');
-    box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;max-height:40vh;'+
-      'overflow:auto;background:#000;color:#0f0;font:11px/1.4 ui-monospace,monospace;'+
-      'padding:6px;white-space:pre-wrap;-webkit-user-select:text;user-select:text';
-    box.textContent='debug on — reproduce the bug (activate search, scroll), then read here.';
-    box.onclick=()=>{ const r=document.createRange(); r.selectNodeContents(box);
-      const s=getSelection(); s.removeAllRanges(); s.addRange(r); };
-    document.body.appendChild(box);
-    const hits=[]; let worst=0;
-    const paint=()=>{ box.textContent =
-      'WORST barTop '+Math.round(worst)+'px  (negative = bar above screen). Tap to select.\n'+
-      hits.map(h=>JSON.stringify(h)).join('\n'); };
-    (function watch(){
-      const top=bar.getBoundingClientRect().top;   // silent read — proven not to mask
-      if(top < worst-0.5){                          // NEW worst only → rare repaint
-        worst=top;
-        hits.unshift({
-          barTop:Math.round(top),
-          pos: getComputedStyle(bar).position,        // sticky = pin didn't engage; fixed = fixed also broke
-          pinned: bar.classList.contains('pinned')?'Y':'-',
-          offsetTop: vv?Math.round(vv.offsetTop):'n/a',
-          vvHeight: vv?Math.round(vv.height):'n/a',
-          scrollY:Math.round(window.scrollY),
-          innerH:window.innerHeight,
-          focused: document.activeElement===document.getElementById('q')?'Y':'-',
-        });
-        hits.length=Math.min(hits.length,10);
-        paint();
-      }
-      requestAnimationFrame(watch);
-    })();
-  }
 
   // deep-link support (QR / shared link)
   if(location.hash){ const id=location.hash.slice(1); if(data.some(d=>d.id===id)) openModal(id); }
