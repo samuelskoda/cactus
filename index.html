@@ -575,45 +575,24 @@
   const scrollAnchorEl = document.getElementById('scrollAnchor');
   const vv = window.visualViewport;
   let pinned=false;
+  // The bar is position:sticky ALWAYS (never fixed). To sit at the visible top under the
+  // keyboard's pan it sticks at top=offsetTop instead of top:0. Two properties matter:
+  //  - sticky lives in the SCROLL layer, so it has no position:fixed paint lag (the gap that
+  //    opened above a fixed bar mid-scroll, invisible to getBoundingClientRect).
+  //  - its top is set ONCE per settle and NOT chased per frame. Chasing offsetTop every
+  //    frame is what made the earlier sticky version jumpy; a constant top can't jump.
+  //    offsetTop only re-reads when a scroll SETTLES (onSettled), never mid-scroll.
   const goSticky = ()=>{
-    if(!pinned) return;
     pinned=false;
-    searchbarEl.classList.remove('pinned');
     searchbarEl.style.top = '';           // back to the CSS sticky top:0
-    scrollAnchorEl.style.height = '0';
   };
-  const pinFixed = (t)=>{
-    if(!pinned){
-      pinned=true;
-      scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
-      searchbarEl.classList.add('pinned');
-      startTrack();   // keep top glued to offsetTop every frame while pinned
-    }
+  const pinFixed = (t)=>{                  // "pin" = sticky at a constant top=offsetTop
+    pinned=true;
     searchbarEl.style.top = t+'px';
   };
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
   const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
-  // Per-frame tracking: while the keyboard is up, iOS reduces the pan (offsetTop) as you
-  // scroll toward the top, so the pinned bar's top must follow it. Doing that only on
-  // visualViewport events lags between events, and for the lagging frames barTop =
-  // oldTop - newOffsetTop opens a visible GAP above the bar (worst when you reverse the
-  // scroll). A rAF loop sets top=offsetTop every frame instead, so there's no lag to gap.
-  // Safe from the old "rubber": offsetTop now moves smoothly (the keyboard stays up — no
-  // close-thrash), so following it 1:1 per frame is smooth.
-  let trackRaf=0;
-  const trackTop=()=>{
-    if(!pinned){ trackRaf=0; return; }
-    const t=Math.max(0,Math.round(vv.offsetTop));
-    if(searchbarEl.style.top!==t+'px') searchbarEl.style.top=t+'px';
-    // Force a per-frame layout read of the bar. On some devices iOS lets a fixed element
-    // lag on the compositor thread during a scroll (a transient gap opens above the bar
-    // and snaps back when scrolling stops); reading its rect each frame nudges iOS to keep
-    // the layer synced to its CSS position.
-    void searchbarEl.getBoundingClientRect().top;
-    trackRaf=requestAnimationFrame(trackTop);
-  };
-  const startTrack=()=>{ if(!trackRaf) trackRaf=requestAnimationFrame(trackTop); };
   if(vv){
     let settleTimer=null, armedScrollY=0;
     function arm(){
@@ -638,16 +617,9 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      if(pinned){
-        // Stay FIXED through the whole keyboard-close scroll; hand back to sticky only when
-        // everything has settled (in onSettled). Measured in the iOS simulator: during a
-        // scroll-dismiss, offsetTop oscillates 0 <-> big-negative every frame while the
-        // keyboard height stays shrunk. If we unpin to sticky, the sticky bar follows those
-        // swings and flies ABOVE the viewport and back each frame — the violent flicker.
-        // A fixed bar clamped to top=max(0,offsetTop) sits at top:0 through the negatives,
-        // which can only ever put it AT or BELOW its spot, never above.
-        searchbarEl.style.top = Math.max(0, Math.round(vv.offsetTop)) + 'px';
-      }
+      // Deliberately do NOT touch the bar's top here. While pinned the bar is sticky with a
+      // constant top; changing it mid-scroll (chasing offsetTop) is exactly what made it
+      // jumpy. offsetTop is only re-read when the scroll settles (onSettled). Just re-arm.
       arm();
     }
     vv.addEventListener('resize', onChange);
