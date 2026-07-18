@@ -606,6 +606,11 @@
     if(!pinned){ trackRaf=0; return; }
     const t=Math.max(0,Math.round(vv.offsetTop));
     if(searchbarEl.style.top!==t+'px') searchbarEl.style.top=t+'px';
+    // Force a per-frame layout read of the bar. On some devices iOS lets a fixed element
+    // lag on the compositor thread during a scroll (a transient gap opens above the bar
+    // and snaps back when scrolling stops); reading its rect each frame nudges iOS to keep
+    // the layer synced to its CSS position.
+    void searchbarEl.getBoundingClientRect().top;
     trackRaf=requestAnimationFrame(trackTop);
   };
   const startTrack=()=>{ if(!trackRaf) trackRaf=requestAnimationFrame(trackTop); };
