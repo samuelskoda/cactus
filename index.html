@@ -649,11 +649,14 @@
     // count has to start from the blur, since only stillness AFTER it means anything.
     stillFrames=0;
   });
-  let trackRaf=0, lastOff=-1, stillFrames=0;
+  let trackRaf=0, lastOff=-1, lastVH=-1, stillFrames=0;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
     const off=Math.max(0,Math.round(vv.offsetTop));
-    if(off===lastOff) stillFrames++; else { stillFrames=0; lastOff=off; }
+    // Stillness means the viewport is not moving in ANY way, so height counts too: a keyboard
+    // close can restore vv.height while offsetTop holds, and that is motion, not stillness.
+    const vh=Math.round(vv.height);
+    if(off===lastOff && vh===lastVH) stillFrames++; else { stillFrames=0; lastOff=off; lastVH=vh; }
     // Slot back on screen (scrolling UP toward the header): the bar belongs in the flow, and
     // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
     // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
@@ -672,9 +675,13 @@
     if(closing){
       if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       // Safety net only: blurred but the keyboard never actually left (iOS can keep it up).
-      // A real close moves the viewport every frame, so a long stillness means no close is
-      // happening and the hold would strand the bar off-screen. Long enough not to trip mid-close.
-      if(keyboardUp() && stillFrames>=12){
+      // The threshold has to be generous, because "still" does NOT mean "no close is coming":
+      // after a tap-dismiss (the keyboard's own Done/checkmark) iOS leaves offsetTop AND
+      // vv.height completely unchanged for ~230ms before it starts animating. At 12 frames this
+      // tripped in that dead time and snapped the bar down by offsetTop for a frame, right
+      // before the close began — the jump when using the checkmark. A real close always gets
+      // moving well within 1s, so only past that does stillness really mean nothing is coming.
+      if(keyboardUp() && stillFrames>=60){
         closing=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
         searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
