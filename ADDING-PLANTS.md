@@ -11,7 +11,7 @@ then commit & push to publish.
    once, in the order plants are added, and never get reused or reshuffled even if the plant
    would otherwise sort earlier in the alphabetical grid.
 2. **Add the photo** to a folder named `<number>-<slug>` after the plant's `id`, e.g.
-   `photos/38-mammillaria-elongata/IMG_9600.jpeg`. One folder per plant — it can hold several
+   `photos/38-mammillaria-elongata/IMG_9600.webp`. One folder per plant — it can hold several
    photos. The one named in `file` is the thumbnail; to show the others too, list them all in
    a `files` array (see field reference) and the detail view gets ‹ › arrows to flip through.
 3. **Copy the template below** into the `window.CACTI = [ … ]` array in `data.js` (anywhere;
@@ -27,7 +27,7 @@ then commit & push to publish.
 
 ## Template
 ```js
-{ id: "38-genus-species", file: "photos/38-genus-species/IMG_XXXX.jpeg", name: "Genus species",
+{ id: "38-genus-species", file: "photos/38-genus-species/IMG_XXXX.webp", name: "Genus species",
   tag: "Genus species", genus: ["Genus"], region: ["Mexico & SW USA"],
   origin: "Central Mexico",
   blurb: "One or two sentences: what it looks like, flowers, and basic care." },
@@ -39,7 +39,7 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 | Field | What to put |
 |---|---|
 | `id` | **Unique, stable, numbered** slug — `<number>-<genus-species>`, e.g. `38-mammillaria-elongata`. This is the plant's `#tag` (its permanent display **Catalog #**, e.g. `38`). Its page URL is `?p=<id>`; the older `#<id>` form still resolves too. The number alone disambiguates duplicate species now, so **don't** add a trailing `-1`/`-2` to the slug — two Astrophytum myriostigma are simply `2-astrophytum-myriostigma` and `3-astrophytum-myriostigma`. **Avoid reusing or renaming an existing id** — any link already shared for that plant would stop resolving. |
-| `file` | Path to the photo inside the plant's own folder: `photos/<id>/IMG_XXXX.jpeg`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. |
+| `file` | Path to the photo inside the plant's own folder: `photos/<id>/IMG_XXXX.webp`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. Photos are **WebP**: export from Photos as JPEG (sRGB, long edge 1600), then convert with `cwebp -q 82 in.jpeg -o out.webp`. Convert from the export, never from an already-web-sized file, so you are not stacking two lossy passes. |
 | `name` | The species (shown as the title, italicised). Its Wikipedia link is auto-built from the first two words. |
 | `tag` | The handwritten pot label text. Used for search; not shown on screen (the visible **Number** row shows `#<the id's leading number>`). |
 | `genus` | **Array.** Normally one, e.g. `["Mammillaria"]`. Drives the green genus filter tag. For a mixed bowl, put `"Mixed & offshoots"` first — see below, it also changes the numbering prefix. |
@@ -64,7 +64,7 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
   **own `x`-numbered sequence** instead of a plain number — the next one is `x3` (find the
   highest existing `xN` the same way you'd find the highest plain number):
   ```js
-  { id: "x3-my-mixed-bowl", file: "photos/x3-my-mixed-bowl/IMG_XXXX.jpeg", name: "Mixed bowl",
+  { id: "x3-my-mixed-bowl", file: "photos/x3-my-mixed-bowl/IMG_XXXX.webp", name: "Mixed bowl",
     genus: ["Mixed & offshoots", "Mammillaria", "Echinopsis"],
     species: ["Mammillaria bombycina", "Echinopsis oxygona"],
     region: ["Mexico & SW USA", "Southern South America"], origin: "Various",
