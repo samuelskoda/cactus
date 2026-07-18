@@ -38,14 +38,14 @@ Add `uncertain: true` at the end if the ID is a guess (shows a yellow **tentativ
 ## Field reference
 | Field | What to put |
 |---|---|
-| `id` | **Unique, stable, numbered** slug — `<number>-<genus-species>`, e.g. `38-mammillaria-elongata`. This is the plant's `#tag` (QR target, and its permanent display **Number**, e.g. `#38`). The number alone disambiguates duplicate species now, so **don't** add a trailing `-1`/`-2` to the slug — two Astrophytum myriostigma are simply `2-astrophytum-myriostigma` and `3-astrophytum-myriostigma`. **Never reuse, renumber, or rename an existing id** once QR codes are printed. |
+| `id` | **Unique, stable, numbered** slug — `<number>-<genus-species>`, e.g. `38-mammillaria-elongata`. This is the plant's `#tag` (QR target, and its permanent display **Catalog #**, e.g. `38`). Its page URL is `?p=<id>`; the older `#<id>` form still opens the same plant, so QR codes already printed keep working. The number alone disambiguates duplicate species now, so **don't** add a trailing `-1`/`-2` to the slug — two Astrophytum myriostigma are simply `2-astrophytum-myriostigma` and `3-astrophytum-myriostigma`. **Never reuse, renumber, or rename an existing id** once QR codes are printed. |
 | `file` | Path to the photo inside the plant's own folder: `photos/<id>/IMG_XXXX.jpeg`. Safe to swap later (e.g. after a reshoot) — the `id` stays fixed. |
 | `name` | The species (shown as the title, italicised). Its Wikipedia link is auto-built from the first two words. |
 | `tag` | The handwritten pot label text. Used for search; not shown on screen (the visible **Number** row shows `#<the id's leading number>`). |
 | `genus` | **Array.** Normally one, e.g. `["Mammillaria"]`. Drives the green genus filter tag. For a mixed bowl, put `"Mixed & offshoots"` first — see below, it also changes the numbering prefix. |
 | `region` | **Array.** Use the existing three: `"Mexico & SW USA"`, `"Andes"`, `"Southern South America"`. Drives the grey region tag. A new value just adds a new filter chip. |
 | `origin` | Free text native range shown on the card, e.g. `"S Brazil"`. |
-| `blurb` | Description paragraph shown in the detail view. To point at another plant, reference its `#id` (e.g. `#20-mammillaria-compressa`) — it renders as a clickable link showing just that plant's number (`#20`). |
+| `blurb` | Description paragraph shown in the detail view. To point at another plant, reference its `#id` (e.g. `#20-mammillaria-compressa`) — it renders as a clickable link showing just that plant's number — `#20` in English, `č. 20` in Slovak. |
 | `uncertain` | `true` → yellow **tentative** tag. Omit if confident. |
 | `species` | **Mixes only.** Array of the component species (see below). |
 | `files` | **Optional.** Array of photo paths when the plant has more than one — put the `file` photo first (it stays the grid thumbnail). The detail view shows ‹ › arrows and a photo counter. Omit for single-photo plants. |
