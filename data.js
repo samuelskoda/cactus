@@ -174,7 +174,7 @@ window.CACTI = [
     blurb: "The 'ladyfinger cactus' — mounds of slender, finger-like stems laced with interlocking golden spines. It forms a big, spreading clump over time and carries small cream-to-yellow flowers. Undemanding and quick; a reliable, decorative filler.",
     blurb_sk: "„Dámske prstíky“ — vankúše štíhlych prstovitých stoniek prepletených zlatými tŕňmi. Časom vytvorí veľký rozložitý trs a nesie malé krémové až žlté kvety. Nenáročná a rýchla; spoľahlivá dekoratívna výplň." },
 
-  { id: "x2-mixed-dish-bowl", file: "photos/x2-mixed-dish-bowl/IMG_9514.jpeg", name: "Mixed seedling dish", name_sk: "Miešaná miska semenáčikov", tag: "— (dish planting)",
+  { id: "x2-mixed-dish-bowl", file: "photos/x2-mixed-dish-bowl/IMG_9514.jpeg", name: "Mixed offshoots bowl", name_sk: "Miešaná miska odnoží", tag: "— (dish planting)",
     genus: ["Mixed & offshoots", "Kroenleinia", "Mammillaria", "Echinopsis", "Coryphantha"],
     species: ["Kroenleinia grusonii", "Mammillaria bombycina", "Echinopsis ancistrophora", "Coryphantha elephantidens"],
     region: ["Mexico & SW USA", "Andes"], origin: "Mexico & S America",

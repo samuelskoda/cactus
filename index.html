@@ -173,19 +173,23 @@
      box used to be sized by the current <img> itself, so stepping to a photo with different
      dimensions resized the whole sheet. --ar is a fallback until the first photo reports its
      size; overflow:hidden keeps the spacer from pushing past the max-height cap. */
-  .sheet .photo{position:relative;height:100%;max-height:80vh;overflow:hidden;--ar:.75}
+  .sheet .photo{position:relative;height:100%;max-height:80vh;overflow:hidden;--ar:.75;
+    touch-action:pan-y}
   .sheet .photo::before{content:'';display:block;padding-top:calc(var(--ar) * 100%)}
-  /* Every photo of the set is rendered as a stacked layer and we cross-fade between them,
-     rather than swapping one <img>'s src — a swap blanks the element while the new file
-     decodes. The slide is small and follows the swipe direction, so the motion reads as
-     "the next photo came from that side". */
-  .sheet .photo img{position:absolute;inset:0;width:100%;height:100%;
-    object-fit:cover;background:var(--sand);
-    opacity:0;transform:translateX(0);pointer-events:none;
-    transition:opacity .26s ease, transform .26s ease}
-  .sheet .photo img.on{opacity:1;transform:none;pointer-events:auto}
+  /* The photos lie side by side in one row and the row slides, so a drag moves between
+     neighbours exactly as far as the finger does. Rendering them all also avoids swapping a
+     single <img>'s src, which blanks the element while the new file decodes.
+     touch-action:pan-y lets the browser keep vertical scrolling while handing horizontal
+     gestures to us, so the listeners can stay passive and never fight the sheet's scroll. */
+  .sheet .photo .track{position:absolute;inset:0;display:flex;
+    transition:transform .32s cubic-bezier(.22,.61,.36,1);will-change:transform}
+  .sheet .photo .track img{flex:0 0 100%;width:100%;height:100%;
+    object-fit:cover;background:var(--sand)}
+  /* Above the sliding row. Without this the photos paint over the controls and the arrows and
+     counter vanish — the track is a positioned element, so the controls need to out-rank it. */
+  .photo .nav, .photo .pcount{z-index:2}
   @media (prefers-reduced-motion:reduce){
-    .sheet .photo img{transition:opacity .12s ease;transform:none !important}
+    .sheet .photo .track{transition:none}
   }
   .photo .nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;
     border:none;border-radius:50%;background:rgba(20,18,12,.5);color:#fff;
@@ -297,7 +301,7 @@
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
      index.html — a stale data.js here previously broke photo paths and clicks -->
-<script src="data.js?v=5"></script>
+<script src="data.js?v=6"></script>
 <script>
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
@@ -333,7 +337,8 @@
       title:'Moja zbierka kaktusov',
       h1:'🌵 Moja zbierka kaktusov',
       intro:'Fotografický katalóg kaktusov v kvetináčoch. Prezerajte podľa rodu alebo oblasti pôvodu, prípadne hľadajte podľa názvu. Ťuknutím na rastlinu zobrazíte podrobnosti.',
-      plants:'Rastliny', species:'Druhy', genera:'Rody', regions:'Oblasti',
+      // Genitive plural: these labels read as the count above them — "37 rastlín".
+      plants:'Rastlín', species:'Druhov', genera:'Rodov', regions:'Oblastí',
       searchPlaceholder:'Hľadať…', searchAria:'Hľadať', clearSearch:'Vymazať hľadanie', filter:'Filter',
       tentative:'Neisté', inFlower:'Kvitne', inFlowerCard:'Fotografia s kvetom',
       mixed:'Miešané a odnože',
@@ -421,8 +426,8 @@
     t.onclick=()=>selectFilter('tentative');
     el.appendChild(t);
     const f=document.createElement('button');
-    f.className='chip c-flower'; f.textContent='🌸'; f.dataset.other='flower';
-    f.title=I18N[lang].inFlower; f.setAttribute('aria-label', I18N[lang].inFlower);
+    f.className='chip c-flower'; f.dataset.other='flower';
+    f.textContent='🌸 '+I18N[lang].inFlower;
     f.onclick=()=>selectFilter('flower');
     el.appendChild(f);
   }
@@ -628,7 +633,7 @@
     const files = (d.files && d.files.length) ? d.files : [d.file];
     sheet.innerHTML=`
       <div class="photo">
-        ${files.map((f,k)=>`<img src="${f}" alt="${escAttr(nameOf(d))}"${k===0?' class="on"':''}>`).join('')}
+        <div class="track">${files.map(f=>`<img src="${f}" alt="${escAttr(nameOf(d))}">`).join('')}</div>
         ${files.length>1?`
         <button class="nav prev" aria-label="${escAttr(t('prevPhoto'))}" hidden>‹</button>
         <button class="nav next" aria-label="${escAttr(t('nextPhoto'))}">›</button>
@@ -655,7 +660,7 @@
     // different dimensions never resizes the sheet. Done for single photos too, so the box is
     // always driven by the spacer rather than by the <img>.
     {
-      const photoEl=sheet.querySelector('.photo'), first=sheet.querySelector('.photo img');
+      const photoEl=sheet.querySelector('.photo'), first=sheet.querySelector('.photo .track img');
       const lockRatio=()=>{
         if(first.naturalWidth && first.naturalHeight)
           photoEl.style.setProperty('--ar', (first.naturalHeight/first.naturalWidth).toFixed(4));
@@ -665,56 +670,60 @@
     }
     if(files.length>1){
       let i=0;
-      const photoEl=sheet.querySelector('.photo');
-      const imgs=[...photoEl.querySelectorAll('img')], pcount=sheet.querySelector('.pcount');
+      const photoEl=sheet.querySelector('.photo'), track=photoEl.querySelector('.track');
+      const pcount=sheet.querySelector('.pcount');
       const prev=sheet.querySelector('.nav.prev'), next=sheet.querySelector('.nav.next');
-      const SLIDE=6;   // % of the box the layers travel; enough to read as motion, not a lurch
+      // Position the row: index i sits under the window, plus any live drag offset.
+      const setX=(px, animate)=>{
+        track.style.transition = animate ? '' : 'none';
+        track.style.transform  = `translateX(calc(${-i*100}% + ${px}px))`;
+      };
       const show=n=>{
-        const from=i;
         i=Math.max(0, Math.min(files.length-1, n));   // no wrap-around: ends are ends
-        if(i!==from){
-          const dir = i>from ? 1 : -1;               // +1 = moving forward through the set
-          // Only the ARRIVING layer animates, and it does so on top of the one it replaces,
-          // which simply stays put and opaque underneath. Fading the outgoing one out as well
-          // left a gap mid-transition where neither layer was solid and the panel background
-          // showed through, so the photo appeared to fade up out of nothing rather than to
-          // replace what was there. Whichever layer is topmost and opaque wins, so the ones
-          // below need no cleanup.
-          imgs.forEach((im,k)=>{
-            im.style.zIndex = k===i ? '2' : (k===from ? '1' : '0');
-            if(k!==i){ im.style.transform=''; return; }
-            // Park it offset on the side it is arriving from with transitions suppressed, then
-            // flush layout so the move to its resting place actually animates — without the
-            // flush the browser coalesces both writes and the layer just appears.
-            im.style.transition='none';
-            im.style.transform=`translateX(${dir*SLIDE}%)`;
-            im.classList.remove('on');
-            void im.offsetWidth;
-            im.style.transition='';
-            im.style.transform='';
-            im.classList.add('on');
-          });
-        }
+        setX(0, true);
         pcount.textContent=`${i+1} / ${files.length}`;
         prev.hidden = i===0;
         next.hidden = i===files.length-1;
       };
       prev.onclick=()=>show(i-1);
       next.onclick=()=>show(i+1);
-      // Swipe left/right across the photo to step through the set. Listeners stay passive so a
-      // vertical drag still scrolls the sheet; a swipe only counts when it is clearly sideways,
-      // which is what keeps it from stealing that scroll.
-      let sx=0, sy=0, tracking=false;
+      // Drag the row with the finger, then settle to whichever photo it ended up nearest.
+      // Direction is decided once per gesture: past a small threshold the gesture is either
+      // ours (horizontal) or the sheet's (vertical), and it never changes hands mid-drag, so a
+      // diagonal scroll cannot end up nudging the photos. touch-action:pan-y means we never
+      // have to preventDefault to hold on to it.
+      let sx=0, sy=0, dx=0, decided=false, dragging=false;
       photoEl.addEventListener('touchstart', e=>{
-        if(e.touches.length!==1){ tracking=false; return; }
-        sx=e.touches[0].clientX; sy=e.touches[0].clientY; tracking=true;
+        if(e.touches.length!==1){ decided=true; dragging=false; return; }
+        sx=e.touches[0].clientX; sy=e.touches[0].clientY;
+        dx=0; decided=false; dragging=false;
       }, {passive:true});
-      photoEl.addEventListener('touchend', e=>{
-        if(!tracking) return;
-        tracking=false;
-        const t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy;
-        if(Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)*1.5) show(dx<0 ? i+1 : i-1);
+      photoEl.addEventListener('touchmove', e=>{
+        if(e.touches.length!==1) return;
+        const mx=e.touches[0].clientX-sx, my=e.touches[0].clientY-sy;
+        if(!decided){
+          if(Math.abs(mx)>10 && Math.abs(mx)>Math.abs(my)){ decided=true; dragging=true; }
+          else if(Math.abs(my)>10){ decided=true; dragging=false; }   // the sheet's scroll
+          else return;
+        }
+        if(!dragging) return;
+        dx=mx;
+        // Resist at the ends so the row cannot be pulled off into empty space.
+        if((i===0 && dx>0) || (i===files.length-1 && dx<0)) dx*=0.32;
+        setX(dx, false);
       }, {passive:true});
+      const settle=()=>{
+        if(!dragging){ decided=false; return; }
+        dragging=false; decided=false;
+        // A fifth of the box, so a short flick counts without a careless nudge doing so.
+        const threshold=Math.max(40, photoEl.clientWidth*0.2);
+        if(dx<=-threshold)      show(i+1);
+        else if(dx>=threshold)  show(i-1);
+        else                    setX(0, true);   // snap back to where we were
+        dx=0;
+      };
+      photoEl.addEventListener('touchend', settle, {passive:true});
+      photoEl.addEventListener('touchcancel', settle, {passive:true});
     }
   }
   function closeModal(){ openId=null; modal.classList.remove('open'); document.body.classList.remove('noscroll'); if(location.hash) history.replaceState(null,'',location.pathname); }
@@ -1083,7 +1092,7 @@
     const mix=document.querySelector('#otherFacet .chip[data-other="mixed"]'); if(mix) mix.textContent = genusLabel(SPECIAL);
     const ten=document.querySelector('#otherFacet .chip[data-other="tentative"]'); if(ten) ten.textContent = L.tentative;
     const flw=document.querySelector('#otherFacet .chip[data-other="flower"]');
-    if(flw){ flw.title = L.inFlower; flw.setAttribute('aria-label', L.inFlower); }
+    if(flw) flw.textContent = '🌸 '+L.inFlower;
     emptyMsgEl.textContent = L.noMatch;
     for(const d of sortedAll){
       const el = cardEls.get(d.id); if(!el) continue;
