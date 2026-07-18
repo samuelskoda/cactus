@@ -642,6 +642,12 @@
     // so set it after.
     if(!pinned) pinFixed(Math.max(0, Math.round(vv.offsetTop)));
     closing=true; searchbarEl.style.top=naturalTop()+'px';
+    // Restart the stillness count. It measures "the viewport is not moving, so no close is
+    // actually happening" — but before the blur the viewport had been at rest with the keyboard
+    // up, so the count was already way past the threshold and the safety net fired on the very
+    // next frame, undoing the hold and snapping the bar offsetTop px DOWN for ~4 frames. The
+    // count has to start from the blur, since only stillness AFTER it means anything.
+    stillFrames=0;
   });
   let trackRaf=0, lastOff=-1, stillFrames=0;
   const trackTop=()=>{
@@ -652,9 +658,13 @@
     // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
     // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
     // a chase, and a chase always lands a frame late: that was the jitter when sliding up.
-    // So hand it back and go static. Not while `closing` — iOS breaks sticky mid keyboard
-    // close, which is the whole reason the pin exists.
-    if(!closing && naturalTop() > 0){ goSticky(); trackRaf=0; return; }
+    // So hand it back and go static.
+    // This applies even mid-close. The sticky bug we pin against only affects the bar while it
+    // is STUCK; with its slot visible the bar is in ordinary flow, so there is nothing for
+    // sticky to get wrong. Excluding `closing` here meant an up-swipe (which both dismisses and
+    // scrolls) stayed pinned and chased the slot — measured barTop trailing anchorTop by one
+    // frame the whole way, which is exactly the jitter.
+    if(naturalTop() > 0){ goSticky(); trackRaf=0; return; }
     // Two different reasons to hold top:0, with different exits — conflating them broke both.
     // `closing`: a blur fired, the keyboard is on its way out. Hold until it is fully gone. It
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
