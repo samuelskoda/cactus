@@ -864,10 +864,12 @@
   // was up — the state where iOS sticky is unreliable — and that is the regime a *tiny* scroll
   // sits in. A few px of hysteresis keeps the pin until the slot has really moved.
   const STICK_EPS = 4;
-  // The slot offset actually used to POSITION the pinned bar. While pinned the slot is at (or a
-  // hair above) the top by construction, so anything within STICK_EPS is rounding, not position;
-  // adding it to top would sit the bar those px below flush, which is the thin gap.
-  const slotTop = ()=>{ const v=naturalTop(); return v>STICK_EPS ? v : 0; };
+  // STICK_EPS governs the swap DECISION only — never where the bar is placed. Placement always
+  // uses the true naturalTop(), so the pinned position and the sticky position are the same
+  // number and swapping between them moves nothing. Rounding the placement down to 0 inside the
+  // threshold made the two disagree by up to STICK_EPS: releasing the pin dropped the bar onto
+  // its real slot (a flash slightly below), and taking the pin lifted it out from under a caret
+  // iOS had already drawn (the cursor sitting slightly above the field).
   // How far offsetTop must leave its resting value to count as a real viewport pan rather than
   // compositor jitter. A keyboard pan moves several hundred px; the jitter is a few.
   const PAN_EPS = 24;
@@ -886,7 +888,7 @@
     }
     closing=false; panHold=false;
     restOff = t;
-    searchbarEl.style.top = (t + slotTop())+'px';
+    searchbarEl.style.top = (t + naturalTop())+'px';
     // Start the tracking loop on EVERY pin, not just the unpinned->pinned transition. A pin
     // that arrived while the loop was stopped (re-pinning during a bounce) otherwise left the
     // bar frozen at whatever top it was given, so it stopped following the pan.
@@ -910,7 +912,7 @@
     // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
     // so set it after.
     if(!pinned) pinFixed(panOffset());
-    closing=true; searchbarEl.style.top=slotTop()+'px';
+    closing=true; searchbarEl.style.top=naturalTop()+'px';
     // Restart the stillness count. It measures "the viewport is not moving, so no close is
     // actually happening" — but before the blur the viewport had been at rest with the keyboard
     // up, so the count was already way past the threshold and the safety net fired on the very
@@ -951,9 +953,9 @@
       // before the close began — the jump when using the checkmark. A real close always gets
       // moving well within 1s, so only past that does stillness really mean nothing is coming.
       if(keyboardUp() && stillFrames>=60){
-        closing=false; restOff=off; searchbarEl.style.top=(off+slotTop())+'px';
+        closing=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
-        searchbarEl.style.top=slotTop()+'px';                     // fixed is visual-relative now
+        searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
       }
       trackRaf=requestAnimationFrame(trackTop);
       return;
@@ -965,9 +967,9 @@
     if(panHold){
       if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
-        panHold=false; restOff=off; searchbarEl.style.top=(off+slotTop())+'px';
+        panHold=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
-        searchbarEl.style.top=slotTop()+'px';
+        searchbarEl.style.top=naturalTop()+'px';
       }
       trackRaf=requestAnimationFrame(trackTop);
       return;
@@ -992,10 +994,10 @@
     // ordinary keyboard-up scroll, and treating that as a pan flipped the bar to top:0 while
     // the keyboard was still stable-up (fixed still layout-relative) = bar off-screen.
     if(Math.abs(off-restOff)>PAN_EPS){
-      panHold=true; searchbarEl.style.top=slotTop()+'px';
+      panHold=true; searchbarEl.style.top=naturalTop()+'px';
       trackRaf=requestAnimationFrame(trackTop); return;
     }
-    const want=(off+slotTop())+'px';
+    const want=(off+naturalTop())+'px';
     if(searchbarEl.style.top!==want) searchbarEl.style.top=want;
     trackRaf=requestAnimationFrame(trackTop);
   };
