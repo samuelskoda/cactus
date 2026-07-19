@@ -863,11 +863,18 @@
   // literally >0 let a 1-3px rounding/stale read flap the bar to plain sticky while the keyboard
   // was up — the state where iOS sticky is unreliable — and that is the regime a *tiny* scroll
   // sits in. A few px of hysteresis keeps the pin until the slot has really moved.
-  const STICK_EPS = 4;
-  // STICK_EPS governs the swap DECISION only — never where the bar is placed. Placement always
+  // Hysteresis needs TWO thresholds. One boundary used for both directions is just an edge:
+  // hold a drag so the slot hovers on it and the bar flips pinned<->sticky every frame, each
+  // flip toggling the .pinned class and the anchor's height, so a layout change per frame. That
+  // churn is felt as a slight rubber band right around the bar's resting place. Pin only once
+  // the slot is genuinely at the top, release only well after it has left, and keep whatever
+  // mode we are already in between the two — biased toward sticky, which is the free one.
+  const PIN_AT   = 1;   // slot within this of the top -> pin
+  const UNPIN_AT = 8;   // slot further than this below -> hand back to sticky
+  // These govern the swap DECISION only — never where the bar is placed. Placement always
   // uses the true naturalTop(), so the pinned position and the sticky position are the same
   // number and swapping between them moves nothing. Rounding the placement down to 0 inside the
-  // threshold made the two disagree by up to STICK_EPS: releasing the pin dropped the bar onto
+  // threshold made the two disagree by up to that threshold: releasing the pin dropped it onto
   // its real slot (a flash slightly below), and taking the pin lifted it out from under a caret
   // iOS had already drawn (the cursor sitting slightly above the field).
   // How far offsetTop must leave its resting value to count as a real viewport pan rather than
@@ -938,7 +945,7 @@
     // sticky to get wrong. Excluding `closing` here meant an up-swipe (which both dismisses and
     // scrolls) stayed pinned and chased the slot — measured barTop trailing anchorTop by one
     // frame the whole way, which is exactly the jitter.
-    if(naturalTop() > STICK_EPS){ goSticky(); trackRaf=0; return; }
+    if(naturalTop() > UNPIN_AT){ goSticky(); trackRaf=0; return; }
     // Two different reasons to hold top:0, with different exits — conflating them broke both.
     // `closing`: a blur fired, the keyboard is on its way out. Hold until it is fully gone. It
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
@@ -1030,8 +1037,11 @@
       // ...but only once the flow slot is scrolled past. If the slot is still on screen the
       // bar's correct place IS its flow position, which sticky gives natively — pinning there
       // means chasing it per frame, which jitters.
-      if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
-      else goSticky();
+      // Note the dead zone: between PIN_AT and UNPIN_AT neither branch fires and whatever
+      // mode we are in simply persists, which is the whole point of having two thresholds.
+      if(!keyboardUp()) goSticky();
+      else if(naturalTop() <= PIN_AT) pinFixed(panOffset());
+      else if(naturalTop() > UNPIN_AT) goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
@@ -1058,7 +1068,7 @@
       if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
-      else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
+      else if(!pinned && keyboardUp() && naturalTop()<=PIN_AT) pinFixed(panOffset());
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
