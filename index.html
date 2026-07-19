@@ -150,6 +150,12 @@
      shows the plant, and opening it reveals the rest of the frame. Matching the photo's own
      ratio here made the detail view an exact repeat of the preview. */
   .thumb{aspect-ratio:1/1;background:var(--sand);overflow:hidden}
+  /* Long-pressing an image on iOS zooms it and throws up the save/share sheet, which gets in
+     the way of tapping a card and of dragging the photo carousel. -webkit-touch-callout kills
+     the sheet, user-select the text-selection that comes with it. The cost is that long-press
+     to Save Image goes too, which is fine here — these came from Photos in the first place. */
+  .thumb img,
+  .sheet .photo img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .card .body{padding:12px 13px 14px}
   .card .sci{font-style:italic;font-weight:600;font-size:.98rem;margin:0 0 3px}
