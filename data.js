@@ -114,11 +114,11 @@ window.CACTI = [
     blurb: "The odd one out among Stenocactus: instead of many wavy ribs it has fewer, straight, sharp-edged ribs and stout curved spines. White flowers striped magenta open in late winter. A distinctive, collectable Mexican species.",
     blurb_sk: "Výnimka medzi stenokaktusmi: namiesto mnohých vlnitých rebier má menej rovných, ostro hranatých rebier a mohutné zahnuté tŕne. Koncom zimy otvára biele kvety s purpurovými pruhmi. Osobitý, zberateľsky cenený mexický druh." },
 
-  { id: "29-parodia-erubescens", file: "photos/29-parodia-erubescens/IMG_9498.webp", files: ["photos/29-parodia-erubescens/IMG_9498.webp", "photos/29-parodia-erubescens/IMG_9526.webp"], flower: true, name: "Parodia × erubescens", tag: "Parodia × erubescens", genus: ["Parodia"], region: ["Southern South America"], origin: "Uruguay (hybrid)",
+  { id: "29-parodia-erubescens", file: "photos/29-parodia-erubescens/IMG_9526.webp", files: ["photos/29-parodia-erubescens/IMG_9526.webp", "photos/29-parodia-erubescens/IMG_9498.webp"], flower: true, name: "Parodia × erubescens", tag: "Parodia × erubescens", genus: ["Parodia"], region: ["Southern South America"], origin: "Uruguay (hybrid)",
     blurb: "A ribbed green globe with reddish spines, here pushing out a bright bud. This is a documented natural hybrid — Parodia × erubescens (Osten) D.R.Hunt, a cross of P. mammulosa × P. concinna from Uruguay (both formerly Notocactus). Like its parents it's an easy, generous flowerer that enjoys bright light and a little more water than desert cacti.",
     blurb_sk: "Rebrovitá zelená guľa s červenkastými tŕňmi, tu práve vyháňajúca jasný púčik. Ide o zdokumentovaného prirodzeného krížanca — Parodia × erubescens (Osten) D.R.Hunt, kríženca P. mammulosa × P. concinna z Uruguaja (oba kedysi patrili do rodu Notocactus). Podobne ako rodičia je to nenáročný, štedro kvitnúci kaktus, ktorému svedčí jasné svetlo a o niečo viac vody než púštnym druhom." },
 
-  { id: "5-coryphantha-elephantidens", file: "photos/5-coryphantha-elephantidens/IMG_9499.webp", files: ["photos/5-coryphantha-elephantidens/IMG_9499.webp", "photos/5-coryphantha-elephantidens/IMG_7042.webp"], flower: true, name: "Coryphantha elephantidens", tag: "Coryphantha elephantidens", genus: ["Coryphantha"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+  { id: "5-coryphantha-elephantidens", file: "photos/5-coryphantha-elephantidens/IMG_7042.webp", files: ["photos/5-coryphantha-elephantidens/IMG_7042.webp", "photos/5-coryphantha-elephantidens/IMG_9499.webp"], flower: true, name: "Coryphantha elephantidens", tag: "Coryphantha elephantidens", genus: ["Coryphantha"], region: ["Mexico & SW USA"], origin: "Central Mexico",
     blurb: "A fat, glossy dark-green plant with big rounded tubercles that give it its name — the 'elephant's tooth' cactus. From a woolly crown it opens large, silky pink flowers in late summer. Wants warmth, sun and a dry winter.",
     blurb_sk: "Tučná lesklá tmavozelená rastlina s veľkými zaoblenými bradavkami, ktoré jej dali meno — „sloní zub“. Z vlnatého temena otvára koncom leta veľké hodvábne ružové kvety. Chce teplo, slnko a suchú zimu." },
 
@@ -130,7 +130,7 @@ window.CACTI = [
     blurb: "A grey-green 'chin cactus' with broad tubercles and strong, curved spines. Gymnocalyciums tolerate a little more shade than most cacti and open naked-tubed flowers (the name means 'naked calyx'). Slow, tough and long-lived — the smaller of the two saglionis here.",
     blurb_sk: "Sivozelený „bradový kaktus“ so širokými bradavkami a silnými zahnutými tŕňmi. Gymnokalýciá znesú o niečo viac tieňa než väčšina kaktusov a otvárajú kvety s holou kvetnou rúrkou (meno znamená „holý kalich“). Pomalý, odolný a dlhoveký — menší z dvoch tunajších saglionis." },
 
-  { id: "9-echinopsis-ancistrophora", file: "photos/9-echinopsis-ancistrophora/IMG_9502.webp", files: ["photos/9-echinopsis-ancistrophora/IMG_9502.webp", "photos/9-echinopsis-ancistrophora/IMG_7141.webp"], flower: true, name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Andes"], origin: "Argentina & Bolivia (E Andes)",
+  { id: "9-echinopsis-ancistrophora", file: "photos/9-echinopsis-ancistrophora/IMG_7141.webp", files: ["photos/9-echinopsis-ancistrophora/IMG_7141.webp", "photos/9-echinopsis-ancistrophora/IMG_9502.webp"], flower: true, name: "Echinopsis ancistrophora", tag: "Lobivia ancistrophora", genus: ["Echinopsis"], region: ["Andes"], origin: "Argentina & Bolivia (E Andes)",
     blurb: "A second ancistrophora — a ribbed globe with spines pressed close to the body and, in season, big pale funnel flowers on long tubes. Quick and easy in sun.",
     blurb_sk: "Druhá ancistrophora — rebrovitá guľa s tŕňmi pritlačenými k telu a v sezóne s veľkými bledými lievikovitými kvetmi na dlhých rúrkach. Na slnku rýchla a nenáročná." },
 
@@ -146,7 +146,7 @@ window.CACTI = [
     blurb: "A large, solitary globe with broad tubercles and stout, curved spines — a well-grown chin cactus. Small pink-white flowers ring the top in summer. Slow but very long-lived and undemanding.",
     blurb_sk: "Veľká samostatná guľa so širokými bradavkami a mohutnými zahnutými tŕňmi — dobre odchovaný bradový kaktus. V lete obopínajú vrchol malé ružovobiele kvety. Pomalý, ale veľmi dlhoveký a nenáročný." },
 
-  { id: "23-mammillaria-hahniana", file: "photos/23-mammillaria-hahniana/IMG_9506.webp", files: ["photos/23-mammillaria-hahniana/IMG_9506.webp", "photos/23-mammillaria-hahniana/IMG_9258.webp"], flower: true, name: "Mammillaria hahniana", tag: "Mammillaria hahniana", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
+  { id: "23-mammillaria-hahniana", file: "photos/23-mammillaria-hahniana/IMG_9258.webp", files: ["photos/23-mammillaria-hahniana/IMG_9258.webp", "photos/23-mammillaria-hahniana/IMG_9506.webp"], flower: true, name: "Mammillaria hahniana", tag: "Mammillaria hahniana", genus: ["Mammillaria"], region: ["Mexico & SW USA"], origin: "Central Mexico",
     blurb: "The 'old lady cactus' — a globe wrapped in long white hairs and short spines that give it a soft, whiskery look. A ring of deep magenta flowers crowns it in spring. Loves sun; keep the hairs dry to stay white.",
     blurb_sk: "„Stará dáma“ — guľa zahalená v dlhých bielych vlasoch a krátkych tŕňoch, ktoré jej dodávajú mäkký, fúzatý vzhľad. Na jar ju korunuje veniec sýtopurpurových kvetov. Miluje slnko; vlasy udržujte suché, aby zostali biele." },
 
@@ -162,7 +162,7 @@ window.CACTI = [
     blurb: "The 'ball cactus' — a green ribbed body edged in soft golden spines, with a woolly crown and sulphur-yellow flowers. One of the collection's two magnifica; likes bright light and summer water.",
     blurb_sk: "„Guľový kaktus“ — zelené rebrovité telo lemované mäkkými zlatými tŕňmi, s vlnatým temenom a sírovožltými kvetmi. Jedna z dvoch magnific v zbierke; má rada jasné svetlo a letnú zálievku." },
 
-  { id: "32-parodia-magnifica", file: "photos/32-parodia-magnifica/IMG_9513.webp", files: ["photos/32-parodia-magnifica/IMG_9513.webp", "photos/32-parodia-magnifica/IMG_7170.webp"], flower: true, name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
+  { id: "32-parodia-magnifica", file: "photos/32-parodia-magnifica/IMG_7170.webp", files: ["photos/32-parodia-magnifica/IMG_7170.webp", "photos/32-parodia-magnifica/IMG_9513.webp"], flower: true, name: "Parodia magnifica", tag: "Parodia magnifica", genus: ["Parodia"], region: ["Southern South America"], origin: "S Brazil",
     blurb: "The second 'ball cactus' of the collection — a green ribbed body clothed in soft golden spines with a woolly crown and sulphur-yellow flowers. Bright light and summer water suit it.",
     blurb_sk: "Druhý „guľový kaktus“ zbierky — zelené rebrovité telo odeté mäkkými zlatými tŕňmi, s vlnatým temenom a sírovožltými kvetmi. Svedčí mu jasné svetlo a letná zálievka." },
 
