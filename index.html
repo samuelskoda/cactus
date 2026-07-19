@@ -605,13 +605,32 @@
     // offsetTop on the sticky search bar itself is unreliable once it's "stuck"
     // in some browsers, so target a plain (non-sticky) marker just above it and
     // compute its position fresh each time via getBoundingClientRect + scrollY.
+    // The repeat passes exist to beat iOS's own scroll-into-view when the keyboard opens (see
+    // the focus handler). They must not beat the USER though: clicking the field and scrolling
+    // away immediately had the 120ms pass haul the page back to the top — measured going to
+    // 490 and returning to 230. A wheel, a fresh touch or a key means someone has taken over,
+    // and from then on we leave the page alone. iOS's own scroll-into-view raises none of
+    // those, so it is still corrected. The listener is registered after the tap that focused
+    // the field, so that tap does not count as taking over.
+    let takenOver = false;
+    const claim = ()=>{ takenOver = true; };
+    const opts = {passive:true};
+    addEventListener('wheel', claim, opts);
+    addEventListener('touchstart', claim, opts);
+    addEventListener('keydown', claim, opts);
     const doScroll=()=>{
+      if(takenOver) return;
       const target = window.scrollY + anchor.getBoundingClientRect().top;
       window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
     };
     doScroll();
     requestAnimationFrame(doScroll);
-    setTimeout(doScroll, 120);
+    setTimeout(()=>{
+      doScroll();
+      removeEventListener('wheel', claim, opts);
+      removeEventListener('touchstart', claim, opts);
+      removeEventListener('keydown', claim, opts);
+    }, 120);
   }
   // menu chips: toggle this filter (clearing the others), then close the dropdown
   const BOOL_FILTER = new Set(['tentative','flower']);   // toggles, not values
