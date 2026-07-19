@@ -63,13 +63,19 @@
      vanishing) and visibly darkened the opaque input and Filter button, clearing once the
      compositor settled. The bar must stay background-less either way, so the blur samples
      the page rather than the bar. -webkit- prefix required below Safari 18. */
-  .searchbar .glass{position:absolute;inset:0;z-index:0;
+  /* The glass reaches ABOVE the bar, and that overhang is load-bearing. iOS composites a
+     sticky element with about a frame of lag during a flick, so content briefly shows through
+     as a thin bright sliver along the top edge. It is invisible to JS — measured barTop is
+     exactly 0 on all 1200 frames of a recording where the video clearly shows the leak — so no
+     amount of repositioning can fix it. Painting past the edge covers the seam instead. The
+     overhang lands on the hero's faded-out bottom, which is already --bg, so it does not show. */
+  .searchbar .glass{position:absolute;inset:-10px 0 0 0;z-index:0;
     background:color-mix(in srgb,var(--bg) 88%, transparent);
     -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
   .searchbar > .wrap{position:relative;z-index:1}
   /* No blur support -> opaque bar, so content can't show through while it's stuck. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
-    .searchbar{background:var(--bg)}
+    .searchbar{background:var(--bg);box-shadow:0 -10px 0 var(--bg)}   /* same overhang, no blur */
     .searchbar .glass{display:none}
   }
   .searchrow{position:relative;display:flex;gap:8px;align-items:center;justify-content:center}
