@@ -349,7 +349,7 @@
       mixed:'Miešané a odnože',
       noMatch:'Žiadne rastliny nezodpovedajú filtrom.',
       count:(shown,total)=>`${shown} z ${total} rastlín`,
-      kSpecies:'Druh', kGenus:'Rod', kOrigin:'Pôvod', kCatalog:'Katalóg č.',
+      kSpecies:'Druh', kGenus:'Rod', kOrigin:'Pôvod', kCatalog:'Kat. č.',
       prevPhoto:'Predchádzajúca fotografia', nextPhoto:'Ďalšia fotografia', close:'Zavrieť',
       footer:'Určenia sú orientačné a nie sú smerodajné — niektoré sú neisté a môžu byť nesprávne.',
       region:{
@@ -816,7 +816,11 @@
   // in-flow rect here reads against the visible top, so it needs no regime correction.
   const naturalTop = ()=> Math.max(0, scrollAnchorEl.getBoundingClientRect().top);
   // offsetTop, with compositor noise removed — see the deadband note in trackTop.
-  const panOffset = ()=>{ const v=Math.max(0, Math.round(vv.offsetTop)); return v<PAN_EPS?0:v; };
+  // Where the viewport is panned to. Used to POSITION the bar, so it must be the true value:
+  // a keyboard pan can legitimately be small (20px measured, when the page needed only a
+  // nudge to reveal the field), and rounding that to 0 pinned the bar 20px above the visible
+  // top, where it stayed. Only the bounce TRIGGER below needs a threshold, and it has its own.
+  const panOffset = ()=> Math.max(0, Math.round(vv.offsetTop));
   // How far the slot must be below the top before the bar is handed back to sticky. Swapping at
   // literally >0 let a 1-3px rounding/stale read flap the bar to plain sticky while the keyboard
   // was up — the state where iOS sticky is unreliable — and that is the regime a *tiny* scroll
@@ -909,7 +913,7 @@
       // before the close began — the jump when using the checkmark. A real close always gets
       // moving well within 1s, so only past that does stillness really mean nothing is coming.
       if(keyboardUp() && stillFrames>=60){
-        closing=false; restOff=off; searchbarEl.style.top=((off<PAN_EPS?0:off)+slotTop())+'px';
+        closing=false; restOff=off; searchbarEl.style.top=(off+slotTop())+'px';
       } else {
         searchbarEl.style.top=slotTop()+'px';                     // fixed is visual-relative now
       }
@@ -923,7 +927,7 @@
     if(panHold){
       if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
-        panHold=false; restOff=off; searchbarEl.style.top=((off<PAN_EPS?0:off)+slotTop())+'px';
+        panHold=false; restOff=off; searchbarEl.style.top=(off+slotTop())+'px';
       } else {
         searchbarEl.style.top=slotTop()+'px';
       }
@@ -953,12 +957,7 @@
       panHold=true; searchbarEl.style.top=slotTop()+'px';
       trackRaf=requestAnimationFrame(trackTop); return;
     }
-    // Deadband the offsetTop noise before it reaches top. The compositor wobbles offsetTop by a
-    // few px during a keyboard-up scroll, and copying that in puts the bar those px BELOW flush
-    // — a thin gap along the top edge, intermittent because it depends on catching a wobbling
-    // frame. A real keyboard pan is hundreds of px (and is handled by the hold above), so
-    // anything under PAN_EPS here is noise, never signal.
-    const want=((off<PAN_EPS?0:off)+slotTop())+'px';
+    const want=(off+slotTop())+'px';
     if(searchbarEl.style.top!==want) searchbarEl.style.top=want;
     trackRaf=requestAnimationFrame(trackTop);
   };
@@ -1009,14 +1008,14 @@
       // clearly mid-screen on video) while getBoundingClientRect still reported 0, because the
       // rect API answers in LAYOUT coordinates during a pan. Trust the video, not the rect.
       // Then reuse the `closing` hold: keep top:0 until the pan unwinds, then hand to sticky.
-      // panOffset(), not raw offsetTop: this is the one trigger that still took any nonzero
+      // A threshold, not any nonzero value: this is the one trigger that took any nudge
       // value as a bounce. Scrolling DOWN on a real device also collapses Safari's toolbar,
       // which perturbs the visual viewport by a few px (traces show vv.height overshooting
       // innerHeight, 754 vs 714). Reading that as a rubber-band pinned the bar at top:0 on the
       // visual-relative assumption while it was still layout-relative, shifting it a few px —
       // a thin gap, only while scrolling down, and only when the toolbar transition coincides.
       // A real bounce reaches ~200px, so requiring PAN_EPS costs it nothing.
-      if(!closing && !keyboardUp() && panOffset() > 0){ pinFixed(0); closing=true; }
+      if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
       else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
