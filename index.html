@@ -1243,8 +1243,15 @@
     if(preScrolled){ preScrolled=false; window.scrollTo({top:preY, behavior:'instant'}); }
   }, {passive:true});
   searchInput.addEventListener('touchend', e=>{
-    if(tapMoved || document.activeElement===searchInput) return;
+    if(document.activeElement===searchInput) return;   // caret taps keep native handling
+    // preventDefault for EVERY touch ending on the unfocused field, moved or not. Our drag
+    // threshold (8px) is tighter than iOS's native tap slop, so a short swipe in the gap
+    // read as a drag to us but as a TAP to iOS - its synthesized click focused the field
+    // through the native, un-taken-over path, and swiping across the bar opened search.
+    // Cancelling click synthesis here closes that path; the scroll the swipe performed is
+    // already done natively and is unaffected.
     e.preventDefault();
+    if(tapMoved) return;                               // a drag: no focus, and now no native one either
     scrollToResults(true);
     searchInput.focus({preventScroll:true});
   }, {passive:false});
