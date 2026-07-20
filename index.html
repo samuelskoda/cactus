@@ -45,19 +45,6 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* SEARCH FREEZE: keeps browsing on the native root scroller (pull-to-refresh,
-     status-bar tap) while disarming the keyboard structurally. Measured law of this
-     configuration: the keyboard-up visual-viewport pan equals min(scrollY, keyboard
-     height) — it follows the SCROLL POSITION. The pan is what a checkmark dismissal
-     animates away while iOS freezes JS, dragging any fixed/pinned bar down mid-screen.
-     So the disarm is scrollY == 0 for the whole keyboard episode: entering search
-     collapses the hero, which puts the bar's natural in-flow slot AT the document top —
-     the classic look (bar on top, results under it) at scrollY 0, with the bar plain
-     sticky. No fixed positioning, no pan, no regimes: there is nothing left for the
-     frozen close to move. The keyboard can only ever exist inside this mode; the freeze
-     (overflow:hidden) keeps everything still while it is up. */
-  body.searchmode{overflow:hidden}
-  body.searchmode header.hero{display:none}
   /* While the keyboard is open, iOS Safari breaks position:sticky — the bar stops sticking
      and scrolls off with the page (measured: barTop -1322 at scrollY 1622, offsetTop 0,
      visualViewport height 362 vs layout 739). position:fixed does NOT have this bug, and
@@ -1068,10 +1055,6 @@
     }
     function onSettled(){
       settleTimer=null;
-      // Search mode owns the bar (fixed by class, offsetTop 0 by construction) — the pin
-      // machinery must not fight it. It remains for any keyboard that appears outside
-      // search mode, which on this page should be never.
-      if(document.body.classList.contains('searchmode')) return;
       // Deceleration fires scroll events sparsely, so 120ms of event silence can pass
       // while the page is still creeping — pinning then, and unpinning on the next event,
       // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
@@ -1093,13 +1076,23 @@
       // made against a stale value. Re-arm rather than decide: arm() re-checks in 120ms, and
       // focusSettling clears within ~130ms, so this defers at most a pass or two.
       if(focusSettling){ arm(); return; }
+      // The post-reveal adjustment: iOS's native reveal leaves the field visible above the
+      // keyboard but not necessarily at the top. Once everything has settled, one smooth
+      // scroll brings the slot the rest of the way. Only while the keyboard is up, only
+      // when the slot is meaningfully off, and at most once per focus (armed on focus),
+      // so it can never loop or fight a user scroll that follows.
+      if(adjustPending && keyboardUp() && naturalTop() > STICK_EPS){
+        adjustPending=false;
+        scrollToResults();
+        arm();               // settle again after the adjustment, then pin below
+        return;
+      }
       if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      if(document.body.classList.contains('searchmode')) return;
       // A viewport pan with NO keyboard is a rubber-band bounce (the bottom one stretches
       // offsetTop to ~215 and eases it back). Sticky slides away with the content during it,
       // so pin and track the pan — top:=offsetTop holds the bar flush the whole bounce.
@@ -1170,78 +1163,9 @@
   // JS-frozen close has nothing to slide. The bar is brought the rest of the way to the top
   // by one smooth adjustment AFTER the keyboard has settled (see onSettled), when iOS is
   // done and there is nobody left to fight.
-  // Touch devices enter SEARCH MODE (see the CSS): the bar becomes a fixed top overlay and
-  // main an inner results panel, with no scrolling of any kind at focus time. Instant — the
-  // native reveal this replaces animated for ~700ms. The tap is taken over at touchend
-  // (preventDefault cancels click synthesis, so nothing can re-target while layout changes
-  // under the finger — the verified-safe pattern) and focus is ours, with the browser's
-  // scroll-into-view suppressed; it would have nothing to do anyway, the field is already
-  // at the visual top, which is exactly the point.
-  const inSearchMode = ()=> document.body.classList.contains('searchmode');
-  const frozenY = 0;   // search mode lives at the document top, always — that IS the disarm
-  function enterSearchMode(){
-    if(inSearchMode()) return;
-    document.body.classList.add('searchmode');            // hero collapses: bar's slot is now the top
-    window.scrollTo({top: 0, behavior: 'instant'});
-  }
-  function exitSearchMode(){
-    if(!inSearchMode()) return;
-    document.body.classList.remove('searchmode');
-    searchbarEl.style.top = '';
-    // hero is back above the bar — land the classic end state: bar sticky at the top,
-    // results under it. Keyboard is fully closed by now; nothing left to race.
-    scrollToResults(true);
-  }
-  // The freeze means nothing should ever scroll the root while searching — but iOS's
-  // keyboard-show restore has been seen scrolling even a frozen root. One deadbanded
-  // instant re-assert keeps the results exactly where they were put.
-  addEventListener('scroll', ()=>{
-    if(!inSearchMode()) return;
-    if(Math.abs(window.scrollY - frozenY) > 8) window.scrollTo({top: frozenY, behavior:'instant'});
-  }, {passive:true});
-  // Insurance, not machinery: search mode's invariant is offsetTop 0 (nothing to reveal,
-  // nothing restored), but if iOS ever pans the viewport anyway (rotation, dictation, an
-  // OS surprise), a top:0 bar renders exactly -offsetTop off-screen. Follow the pan on the
-  // few events that can change it — no rAF, no chasing; with the invariant holding this
-  // never fires at all.
-  if(window.visualViewport){
-    const healPan = ()=>{
-      if(!inSearchMode()) return;
-      const off = Math.max(0, Math.round(window.visualViewport.offsetTop));
-      searchbarEl.style.top = off ? off+'px' : '';
-    };
-    window.visualViewport.addEventListener('resize', healPan);
-    window.visualViewport.addEventListener('scroll', healPan);
-  }
-  // Exit only once the keyboard is really gone: leaving on blur itself would swap the
-  // layout out from under the close animation. Cap it, for blurs where iOS keeps the
-  // keyboard (or there never was one).
-  searchInput.addEventListener('blur', ()=>{
-    if(!inSearchMode()) return;
-    let waited=0;
-    const tick=()=>{
-      if(document.activeElement===searchInput) return;      // refocused meanwhile — stay
-      if(!keyboardUp() || waited>=1000){ exitSearchMode(); return; }
-      waited+=50; setTimeout(tick,50);
-    };
-    setTimeout(tick,50);
-  });
-  let tapX=0, tapY=0, tapMoved=false;
-  searchInput.addEventListener('touchstart', e=>{
-    const t=e.touches[0]; tapX=t.clientX; tapY=t.clientY; tapMoved=false;
-  }, {passive:true});
-  searchInput.addEventListener('touchmove', e=>{
-    const t=e.touches[0];
-    if(Math.abs(t.clientX-tapX)>8 || Math.abs(t.clientY-tapY)>8) tapMoved=true;
-  }, {passive:true});
-  searchInput.addEventListener('touchend', e=>{
-    if(tapMoved || document.activeElement===searchInput) return;
-    e.preventDefault();
-    enterSearchMode();
-    searchInput.focus({preventScroll:true});
-  }, {passive:false});
-  // Desktop (and tab/AT focus): no keyboard gymnastics — just bring the bar to the top.
-  searchInput.addEventListener('focus', ()=>{ if(!inSearchMode()) scrollToResults(true); });
+  let adjustPending=false;
+  searchInput.addEventListener('focus', ()=>{ adjustPending=true; });
+  searchInput.addEventListener('blur',  ()=>{ adjustPending=false; });
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
