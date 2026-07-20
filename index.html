@@ -35,7 +35,24 @@
      inside a non-root scroller keeps working through keyboard transitions. This replaces
      the whole pin-to-fixed machinery, which is gone. */
   html,body{height:100%;overflow:hidden}
-  #pageScroll{height:100dvh;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+  /* No overscroll containment: when #pageScroll is at its top, a continued pull chains to
+     the root, and the root is what Safari's native pull-to-refresh lives on. The chained
+     overscroll drags the whole composition (bar included) exactly like a normal page. */
+  #pageScroll{height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* Root gets a 2px scroll range (see the status-bar-tap hook in the JS): the iOS
+     status-bar tap scrolls THE ROOT to top, so the root must have somewhere to scroll
+     from for the tap to be observable at all. Touch devices only — on desktop the extra
+     2px would just grow a phantom scrollbar. */
+  /* visible, not auto: the viewport's scrollability must come the ordinary way (content
+     2px taller than the viewport), or WebKit gives the root a strange box that accepts
+     scrollTop=1 but silently refuses to scroll back to 0 - measured, and it made the
+     status-bar tap impossible to observe. Both html and body must be visible: with html
+     visible the viewport takes its overflow from body. */
+  html.rootnudge, html.rootnudge body{overflow:visible}
+  /* padding, not a child margin: a last-child bottom margin collapses through the body's
+     edge and leaves the root with zero scroll range (measured scrollHeight == innerHeight,
+     which silently killed the parked 1px and with it the status-bar tap) */
+  html.rootnudge body{height:auto;padding-bottom:2px}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   a{color:var(--accent)}
@@ -337,7 +354,37 @@
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
   const grid = document.getElementById('grid');
-  const scroller = document.getElementById('pageScroll');   // the page scroller — the root never scrolls
+  const scroller = document.getElementById('pageScroll');   // the page scroller — the root scrolls only a 2px stub
+  // iOS's status-bar tap scrolls the ROOT scroller to the top — it cannot see #pageScroll.
+  // So the root keeps a 2px scroll range, PARKED at 1: the tap scrolls it 1 -> 0, that
+  // fires a root scroll event (the only thing that ever scrolls the root besides overscroll
+  // chaining), and this hook forwards the intent to the real scroller. Touch-gated because
+  // a pull-to-refresh spring-back also lands the root on 0 — but that always happens within
+  // moments of a touch, while a status-bar tap involves no touch events at all.
+  if(navigator.maxTouchPoints > 0){
+    document.documentElement.classList.add('rootnudge');
+    const rootEl = document.scrollingElement;
+    let lastTouchT = -1e9, parkT = null;
+    const touched = ()=>{ lastTouchT = performance.now(); };
+    addEventListener('touchstart', touched, {passive:true});
+    addEventListener('touchend', touched, {passive:true});
+    const park = ()=>{ if(rootEl.scrollTop < 1) rootEl.scrollTop = 1; };
+    // Anything can knock the root off its 1px perch and leave it at 0 — the keyboard-show
+    // restore does exactly that, and while the keyboard is up iOS IGNORES programmatic root
+    // scrolls, so a single delayed re-park can silently fail with nothing left to retry
+    // (measured: root stuck at 0, tap hook dead). So re-park after every signal that ends
+    // such an episode: root scrolls, touch ends, and keyboard/viewport changes.
+    const repark = ()=>{ clearTimeout(parkT); parkT = setTimeout(park, 600); };
+    requestAnimationFrame(park);
+    addEventListener('touchend', repark, {passive:true});
+    if(window.visualViewport) window.visualViewport.addEventListener('resize', repark);
+    addEventListener('scroll', ()=>{                    // root scrolls only; element scrolls don't reach window
+      if(rootEl.scrollTop === 0 && performance.now() - lastTouchT > 800){
+        scroller.scrollTo({top:0, behavior:'smooth'});
+      }
+      repark();
+    }, {passive:true});
+  }
   const state = { q:"", region:null, genus:null, tentative:false, flower:false };
 
   const uniq = (arr)=>[...new Set(arr)];
