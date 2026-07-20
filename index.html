@@ -988,7 +988,10 @@
     // holding the fixed pin through the whole close is safe (no scroll to drift against).
     // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
     // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
-    if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
+    // No pan left to correct: sticky is right again, whether or not the keyboard is still up.
+    // Waiting for the keyboard too kept the bar pinned, and so chasing, for the whole time it
+    // was open.
+    if(off===0){ goSticky(); trackRaf=0; return; }
     // offsetTop has left its resting value => the viewport has STARTED panning: the keyboard
     // is being dragged away by iOS's native scroll-to-dismiss (or is closing). iOS switches
     // fixed to VISUAL-relative the instant a pan begins, so the flush position becomes a
@@ -1037,9 +1040,15 @@
       // ...but only once the flow slot is scrolled past. If the slot is still on screen the
       // bar's correct place IS its flow position, which sticky gives natively — pinning there
       // means chasing it per frame, which jitters.
-      // Note the dead zone: between PIN_AT and UNPIN_AT neither branch fires and whatever
-      // mode we are in simply persists, which is the whole point of having two thresholds.
-      if(!keyboardUp()) goSticky();
+      // Pin ONLY when there is a pan to correct. With offsetTop 0 — the usual case, since the
+      // instant focus scroll means iOS never has to pan — sticky already puts the bar exactly
+      // where it belongs, natively and on the compositor. Pinning there buys nothing and costs
+      // a per-frame write plus a mode that can swap as the slot drifts across the thresholds,
+      // and THAT is the slight rubber band felt when dragging around the bar's resting place.
+      // Widening the thresholds only made the swap rarer; not pinning removes it. The close is
+      // still covered, because blur pins before the keyboard starts moving.
+      // Between the thresholds neither branch fires and the current mode persists.
+      if(!keyboardUp() || panOffset() === 0) goSticky();
       else if(naturalTop() <= PIN_AT) pinFixed(panOffset());
       else if(naturalTop() > UNPIN_AT) goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
@@ -1068,7 +1077,7 @@
       if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
-      else if(!pinned && keyboardUp() && naturalTop()<=PIN_AT) pinFixed(panOffset());
+      else if(!pinned && keyboardUp() && panOffset() > 0 && naturalTop()<=PIN_AT) pinFixed(panOffset());
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
