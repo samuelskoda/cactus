@@ -892,15 +892,12 @@
     if(!e.touches[0]) return;
     const dy = Math.abs(e.touches[0].clientY - tStartY);
     if(dy > 8) tMoved = true;
-    // Mid-scroll dismiss, but only once the drag is unmistakably a scroll-away (~48px).
-    // At the old 8px trigger the close began under every touch that moved at all — including
-    // the small back-and-forth around the bar's boundary, and a keyboard close overlapping a
-    // held-finger drag is exactly what reads as rubber (the bar crosses its regime change
-    // under the finger, and near the boundary the pin<->sticky handoff churns inside iOS's
-    // glitchy close window). Below the threshold the keyboard simply stays up, where the bar
-    // is solid: constant top:0 while stuck, native sticky once the slot is on screen. The
-    // lift-dismiss below still catches anything smaller at finger-up, when the close is safe.
-    if(dy > 48 && keyboardUp() && document.activeElement === searchInput) searchInput.blur();
+    // Mid-scroll dismiss at first movement. The trigger must be MOVEMENT, never the touch
+    // itself: a blur before the drag exists starts the keyboard close inside gesture
+    // recognition, iOS freezes JS across the close, and the drag dies under the finger —
+    // the measured freeze. Movement-triggered blur ran for weeks on-device without a
+    // single freeze; by the first 8px the pan is established and survives the close.
+    if(dy > 8 && keyboardUp() && document.activeElement === searchInput) searchInput.blur();
   }, {passive:true});
   // Swipe-to-dismiss at finger LIFT, not mid-movement. While the keyboard is up (pan 0)
   // the bar is already solid under a drag: pinned at a CONSTANT top:0 while stuck — no
