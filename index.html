@@ -611,6 +611,15 @@
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; state.flower=false; }
   // scroll so the sticky search bar sits at the top with the first result just below it
+  // True from the moment a focus scroll starts until it has actually landed. The pin/sticky
+  // decision in onSettled() reads the flow slot live, and it is armed by scroll AND resize
+  // events - which the keyboard's own arrival generates. So the decision races the focus
+  // scroll, and whichever arrives first picks the answer. Win the race (measured: the scroll
+  // lands ~390ms before the keyboard here) and the slot reads its settled value; lose it and
+  // the decision is made against a slot still hundreds of px down the page. That is why this
+  // only ever misbehaved on the FIRST focus: the second time the keyboard is already up, there
+  // is no animation, and so no race to lose.
+  let focusSettling=false, focusSettleTimer=null;
   function scrollToResults(instant){
     const anchor=document.getElementById('scrollAnchor');
     if(!anchor) return;
@@ -644,6 +653,14 @@
       const target = window.scrollY + anchor.getBoundingClientRect().top + OVERSHOOT;
       window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
     };
+    // Only the focus path (instant) races the keyboard; filter/menu scrolls have no keyboard.
+    if(instant===true){
+      focusSettling=true;
+      // Hard release, so a skipped or throwing pass can never strand the flag. Stranded, the
+      // bar would stay unpinned through a keyboard close, which is the mid-screen drop.
+      clearTimeout(focusSettleTimer);
+      focusSettleTimer=setTimeout(()=>{ focusSettling=false; }, 350);
+    }
     doScroll();
     requestAnimationFrame(doScroll);
     setTimeout(()=>{
@@ -651,6 +668,12 @@
       removeEventListener('wheel', claim, opts);
       removeEventListener('touchstart', claim, opts);
       removeEventListener('keydown', claim, opts);
+      // One frame later the instant scroll above has been applied, so the slot now reads its
+      // settled value and the decision is safe to make. Runs even if the user took over: then
+      // the slot is wherever they put it, which is equally a real value.
+      if(instant===true) requestAnimationFrame(()=>{
+        focusSettling=false; clearTimeout(focusSettleTimer);
+      });
     }, 120);
   }
   // menu chips: toggle this filter (clearing the others), then close the dropdown
@@ -1039,6 +1062,10 @@
       // ...but only once the flow slot is scrolled past. If the slot is still on screen the
       // bar's correct place IS its flow position, which sticky gives natively — pinning there
       // means chasing it per frame, which jitters.
+      // A focus scroll is in flight, so the slot is still moving and any decision made now is
+      // made against a stale value. Re-arm rather than decide: arm() re-checks in 120ms, and
+      // focusSettling clears within ~130ms, so this defers at most a pass or two.
+      if(focusSettling){ arm(); return; }
       if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
