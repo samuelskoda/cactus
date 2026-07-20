@@ -951,6 +951,7 @@
     if(!pinned){ trackRaf=0; return; }
     const off=Math.max(0,Math.round(vv.offsetTop));
     const sy=Math.round(window.scrollY), scrolling = sy!==lastSy; lastSy=sy;
+    noteVH();
     // Stillness means the viewport is not moving in ANY way, so height counts too: a keyboard
     // close can restore vv.height while offsetTop holds, and that is motion, not stillness.
     const vh=Math.round(vv.height);
@@ -983,7 +984,15 @@
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
     // start, and releasing there is what put the bar mid-screen.
     if(closing){
-      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
+      // Hand back only once the viewport has genuinely STOPPED, never on keyboardUp() alone.
+      // That test compares innerHeight against vv.height, and mid-close the two shrink together,
+      // so it reads false while the keyboard is still on screen: traced unpinning at vvH 377 and
+      // the keyboard only finishing at vvH 714, a good 260ms later. Sticky is broken in exactly
+      // that window, so the bar dropped and then recovered once the layout settled — the flick
+      // downwards when dismissing with the checkmark. A close animates the viewport nearly every
+      // frame, so stillness is the honest signal that it is over; 10 frames is ~165ms, longer
+      // than any pause within the animation but short enough not to hold the pin around.
+      if(!keyboardUp() && off===0 && stillFrames>=10){ goSticky(); trackRaf=0; return; }
       // Safety net only: blurred but the keyboard never actually left (iOS can keep it up).
       // The threshold has to be generous, because "still" does NOT mean "no close is coming":
       // after a tap-dismiss (the keyboard's own Done/checkmark) iOS leaves offsetTop AND
@@ -1004,7 +1013,8 @@
     // the bar parked offsetTop above the screen while the viewport kept twitching during a
     // keyboard-up scroll — that is the "bar disappears" report.
     if(panHold){
-      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
+      // Same reasoning as the closing hold: wait for the viewport to genuinely stop.
+      if(!keyboardUp() && off===0 && stillFrames>=10){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
         panHold=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
@@ -1045,7 +1055,20 @@
   };
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
-  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
+  // "Is the keyboard up" judged against the TALLEST viewport ever seen, not against
+  // innerHeight. Comparing the two is unreliable mid-close: iOS shrinks innerHeight to match the
+  // keyboard-up viewport partway through, so the test flips to false while the keyboard is still
+  // on screen. Traced pinning at vvH 377 with innerHeight 714 (up), then unpinning at the very
+  // same vvH 377 once innerHeight had followed it down — and sticky is broken in that window, so
+  // the bar dropped and recovered, which is the flick when dismissing with the checkmark. The
+  // tallest height seen is the no-keyboard height and does not move under us. Both tests are
+  // kept, either being enough, so a first frame before fullVH is seeded still behaves.
+  let fullVH = vv ? Math.round(vv.height) : 0;
+  const noteVH = ()=>{ if(vv) fullVH = Math.max(fullVH, Math.round(vv.height)); };
+  const keyboardUp = ()=> !!vv && (
+    (window.innerHeight - vv.height) > 120 ||
+    (fullVH - vv.height) > 120
+  );
   if(vv){
     let settleTimer=null, armedScrollY=0;
     function arm(){
@@ -1080,13 +1103,21 @@
       // Widening the thresholds only made the swap rarer; not pinning removes it. The close is
       // still covered, because blur pins before the keyboard starts moving.
       // Between the thresholds neither branch fires and the current mode persists.
-      if(!keyboardUp() || panOffset() === 0) goSticky();
+      // Never touch the bar while a close is in flight — trackTop owns the hold until the
+      // keyboard is really gone. offsetTop returns to 0 partway through a close, well before
+      // the keyboard finishes, so this branch used to fire ~120ms in and hand the bar back to
+      // sticky mid-close: traced unpinning at vvH 377 with the keyboard still up and only
+      // reaching 714 nearly 300ms later. Sticky is broken in that window, so the bar dropped
+      // and then recovered — the flick downwards when dismissing with the checkmark.
+      if(closing){ /* the hold is trackTop's to release */ }
+      else if(!keyboardUp() || panOffset() === 0) goSticky();
       else if(naturalTop() <= PIN_AT) pinFixed(panOffset());
       else if(naturalTop() > UNPIN_AT) goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
+      noteVH();
       // A viewport pan with NO keyboard is a rubber-band bounce (the bottom one stretches
       // offsetTop to ~215 and eases it back). Sticky slides away with the content during it,
       // so pin and track the pan — top:=offsetTop holds the bar flush the whole bounce.
