@@ -1043,10 +1043,16 @@
     // holding the fixed pin through the whole close is safe (no scroll to drift against).
     // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
     // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
-    // No pan left to correct: sticky is right again, whether or not the keyboard is still up.
-    // Waiting for the keyboard too kept the bar pinned, and so chasing, for the whole time it
-    // was open.
-    if(off===0){ goSticky(); trackRaf=0; return; }
+    // No pan left to correct AND no keyboard: only then is sticky right again. The keyboard
+    // guard is essential, not incidental. offsetTop returns to 0 early in a close, so without it
+    // this unpins mid-close — and sticky is broken exactly there, which drops the bar to
+    // mid-screen. It only bit on the FIRST dismiss of a session: that one has a longer dead time
+    // before iOS animates, long enough for the 60-frame net above to clear `closing` and drop
+    // through to here. Later dismisses never sat still that long, which is why it looked
+    // like a first-time-only fault.
+    // It does not reintroduce chasing: with off 0 and the slot at the top, top is a constant,
+    // and a slot that scrolls into view is handled by UNPIN_AT above.
+    if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
     // offsetTop has left its resting value => the viewport has STARTED panning: the keyboard
     // is being dragged away by iOS's native scroll-to-dismiss (or is closing). iOS switches
     // fixed to VISUAL-relative the instant a pan begins, so the flush position becomes a
