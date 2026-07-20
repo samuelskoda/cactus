@@ -963,7 +963,17 @@
     //     Stay sticky and let onChange pin once the viewport actually starts to move.
     // Told apart by whether the PAGE is moving. A swipe dismiss is scrolling when blur lands; a
     // tap dismiss is not, however much finger is on the glass.
-    if(!pageMoving()){
+    if(pageMoving()){
+      // Swipe dismiss: the page is scrolling, and a pinned bar is position:fixed, which the
+      // compositor drags along and snaps back — the mid-scroll jitter. Sticky does not drift, so
+      // hand back for the scroll and let onChange re-pin once the viewport genuinely moves.
+      // goSticky clears the arming, so re-arm after it.
+      goSticky();
+      closeRef = { off: Math.round(vv.offsetTop), vh: Math.round(vv.height) };
+      closing = true;
+    } else {
+      // Tap dismiss: nothing is scrolling, so hold from here. The bar is normally already pinned
+      // by the invariant above; this covers the case where it is not.
       if(!pinned) pinFixed(panOffset());
       closing=true;            // pinFixed clears it
       stillFrames=0;
@@ -1154,6 +1164,16 @@
       // reaching 714 nearly 300ms later. Sticky is broken in that window, so the bar dropped
       // and then recovered — the flick downwards when dismissing with the checkmark.
       if(closing){ /* the hold is trackTop's to release */ }
+      // INVARIANT: field focused and keyboard up => the bar is pinned. The close hold depends on
+      // it, because a dismiss that begins from sticky drops the bar — sticky is broken while the
+      // keyboard animates away. "Only pin when there is a pan" broke exactly this: whether iOS
+      // pans depends on how far it had to move the field, which depends on which way the focus
+      // scroll went, so the bar was protected when focus scrolled UP to the bar and unprotected
+      // when it scrolled DOWN. That is the direction-dependence reported, and no amount of
+      // tuning the dismiss could fix it, because the fault was already set by then.
+      else if(document.activeElement === searchInput && keyboardUp()){
+        if(!pinned) pinFixed(panOffset());
+      }
       else if(!keyboardUp() || panOffset() === 0) goSticky();
       else if(naturalTop() <= PIN_AT) pinFixed(panOffset());
       else if(naturalTop() > UNPIN_AT) goSticky();
