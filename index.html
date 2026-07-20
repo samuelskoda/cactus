@@ -899,10 +899,15 @@
   // its regime change under a moving finger, and both close-time behaviors (fixed hold's
   // one-frame chase, sticky's mid-close glitch) read as rubber. Dismissing at lift keeps
   // the keyboard up for the whole drag and runs the close after the finger is gone.
-  document.addEventListener('touchend', ()=>{
+  // BOTH end events: when a touch turns into a native scroll, iOS delivers touchCANCEL
+  // rather than touchend (the scroll view claims the gesture) — a lift-dismiss listening
+  // only for touchend never fires for exactly the gesture it exists for.
+  const liftDismiss = ()=>{
     if(tOutside && !tMoved) searchInput.blur();                     // tap outside: dismiss
     else if(tMoved && keyboardUp() && document.activeElement === searchInput) searchInput.blur();
-  }, {passive:true});
+  };
+  document.addEventListener('touchend', liftDismiss, {passive:true});
+  document.addEventListener('touchcancel', liftDismiss, {passive:true});
 
   // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
   // rubber — the content slides on the compositor and JS always follows a frame late).
