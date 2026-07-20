@@ -881,9 +881,15 @@
   let touching = false;
   const endTouch = ()=>{ touching = false; };
   document.addEventListener('touchstart', ()=>{ touching = true; }, {passive:true, capture:true});
+  // When the page last actually moved. This, not finger-down, is what separates a swipe dismiss
+  // from a tap dismiss: tapping the keyboard's checkmark IS a touch, and blur fires while the
+  // finger is still down, so `touching` called every tap a swipe and skipped the pin it needed.
+  let lastScrollAt = -1e9;
+  addEventListener('scroll', ()=>{ lastScrollAt = performance.now(); }, {passive:true, capture:true});
+  const pageMoving = ()=> (performance.now() - lastScrollAt) < 150;
   document.addEventListener('touchend',    endTouch, {passive:true, capture:true});
   document.addEventListener('touchcancel', endTouch, {passive:true, capture:true});
-  const PIN_AT   = 1;   // slot within this of the top -> pin
+  const PIN_AT   = 4;   // slot within this of the top -> pin (a focus scroll rarely lands exact)
   const UNPIN_AT = 8;   // slot further than this below -> hand back to sticky
   // These govern the swap DECISION only — never where the bar is placed. Placement always
   // uses the true naturalTop(), so the pinned position and the sticky position are the same
@@ -945,8 +951,9 @@
     //   swipe dismiss — the page IS scrolling, and a pinned bar is position:fixed, which the
     //     compositor drags along with the scroll and snaps back. That is the mid-scroll jitter.
     //     Stay sticky and let onChange pin once the viewport actually starts to move.
-    // `touching` tells them apart: blur arrives mid-gesture for a swipe, between gestures for a tap.
-    if(!touching){
+    // Told apart by whether the PAGE is moving. A swipe dismiss is scrolling when blur lands; a
+    // tap dismiss is not, however much finger is on the glass.
+    if(!pageMoving()){
       if(!pinned) pinFixed(panOffset());
       closing=true;            // pinFixed clears it
       stillFrames=0;
