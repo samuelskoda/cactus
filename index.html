@@ -1156,18 +1156,31 @@
   // identifies the page scroll, not the bar machinery, as the mover: a sticky bar sits there
   // only when scrollY is back at ~0.) From below the bar is already stuck at the visual top
   // when the tap lands, iOS sees nothing to reveal and stands down — one scroller, never a
-  // fight, which is why that direction never jittered. So make from-above identical: on a tap
-  // iOS synthesizes mousedown -> focus -> click as one burst after touchend, with the target
-  // locked at the tap — so a scroll in mousedown lands before focus, iOS captures the field
-  // already at the top, and stands down here too. mousedown, not touchstart/pointerdown: those
-  // fire for scroll gestures that merely begin on the field, while the synthesized mousedown
-  // means a committed tap. Guarded so tapping the already-focused field (e.g. to move the
-  // caret) does not yank the page back to the slot.
-  searchInput.addEventListener('mousedown', ()=>{
-    if(document.activeElement!==searchInput) scrollToResults(true);
-  });
-  // Kept as the backstop for focus arriving without a tap (tab key, assistive tech) — after
-  // the mousedown pass this is a no-op: the forced pass re-scrolls to where the page already
+  // fight, which is why that direction never jittered.
+  // NOT via a scroll in mousedown: the synthesized click is re-hit-tested at dispatch, so the
+  // card that slides under the tap point receives it — measured on video actually opening that
+  // plant's modal. Instead take over the whole tap at touchend: preventDefault cancels the
+  // click synthesis outright (nothing left to re-target), then scroll, then focus with the
+  // browser's own scroll-into-view suppressed — no second scroller even exists. Only for a
+  // stationary tap on the unfocused field: a scroll gesture ending on the field keeps its
+  // default (it produces no click anyway), and a caret tap on the focused field keeps iOS's
+  // native caret handling.
+  let tapX=0, tapY=0, tapMoved=false;
+  searchInput.addEventListener('touchstart', e=>{
+    const t=e.touches[0]; tapX=t.clientX; tapY=t.clientY; tapMoved=false;
+  }, {passive:true});
+  searchInput.addEventListener('touchmove', e=>{
+    const t=e.touches[0];
+    if(Math.abs(t.clientX-tapX)>8 || Math.abs(t.clientY-tapY)>8) tapMoved=true;
+  }, {passive:true});
+  searchInput.addEventListener('touchend', e=>{
+    if(tapMoved || document.activeElement===searchInput) return;
+    e.preventDefault();
+    scrollToResults(true);
+    searchInput.focus({preventScroll:true});
+  }, {passive:false});
+  // Kept for focus arriving any other way (desktop click, tab key, assistive tech) — after
+  // the touchend path this is a no-op: the forced pass re-scrolls to where the page already
   // is, and the correction passes stand down inside their deadband.
   searchInput.addEventListener('focus', ()=>scrollToResults(true));
   // let the keyboard's Search key dismiss itself
