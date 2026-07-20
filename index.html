@@ -7,7 +7,7 @@
      then keeps working natively — no JS repositioning (and none of its lag/stutter,
      since iOS pans the viewport on the compositor thread, ahead of JS events).
      Browsers without support ignore it and use the JS fallback pinning. -->
-<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>My Cactus Collection</title>
 <style>
   :root{
@@ -38,7 +38,12 @@
   /* No overscroll containment: when #pageScroll is at its top, a continued pull chains to
      the root, and the root is what Safari's native pull-to-refresh lives on. The chained
      overscroll drags the whole composition (bar included) exactly like a normal page. */
-  #pageScroll{height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* 100lvh, not 100dvh: dvh stops at Safari's bottom chrome, leaving a flat opaque band
+     under the toolbar and home indicator where a native page shows its content through the
+     translucency. lvh reaches the physical bottom, restoring the underlap; the padding
+     lets the last content scroll clear of the chrome it now sits beneath. */
+  #pageScroll{height:100lvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 60px)}
   /* Root gets a 2px scroll range (see the status-bar-tap hook in the JS): the iOS
      status-bar tap scrolls THE ROOT to top, so the root must have somewhere to scroll
      from for the tap to be observable at all. Touch devices only — on desktop the extra
@@ -377,19 +382,21 @@
     const repark = ()=>{ clearTimeout(parkT); parkT = setTimeout(park, 600); };
     requestAnimationFrame(park);
     addEventListener('touchend', repark, {passive:true});
+    // A stranded root (0, unparked — e.g. after a PTR spring-back, where every delayed
+    // re-park was refused) re-arms HERE, on the next finger-down: before any scrolling has
+    // begun, so it cannot interfere with an overscroll that hasn't started, and early
+    // enough that the very gesture that follows can already be measured against a parked
+    // root.
+    addEventListener('touchstart', park, {passive:true});
     if(window.visualViewport) window.visualViewport.addEventListener('resize', repark);
     addEventListener('scroll', ()=>{                    // root scrolls only; element scrolls don't reach window
-      if(rootEl.scrollTop === 0){
-        // 500ms, not longer: the gate only exists to exclude a PTR spring-back (which lands
-        // on 0 within moments of its touch), and a longer gate was eating GENUINE taps made
-        // right after scrolling.
-        if(performance.now() - lastTouchT > 500) scroller.scrollTo({top:0, behavior:'smooth'});
-        // Park RIGHT HERE, inside the native scroll's own event dispatch, and regardless of
-        // the gate. Outside a native scroll this root refuses every programmatic scroll
-        // (measured: scrollTo, scrollTop, on html and body, all silently ignored), so the
-        // delayed re-park can fail and strand the root at 0 — where the next tap produces no
-        // event at all. That was "works only once". During a native gesture the attempt is
-        // simply ignored, so this is safe to try unconditionally.
+      // The 500ms gate excludes a PTR spring-back (which lands on 0 within moments of its
+      // touch); longer gates ate genuine taps made right after scrolling. The park shares
+      // the gate: in-dispatch parks are ACCEPTED even mid-gesture (they are how the tap
+      // re-arms at all), so an ungated park during a pull kept yanking the root back to 1
+      // and iOS re-crossed the PTR threshold — the multiple-refresh pull.
+      if(rootEl.scrollTop === 0 && performance.now() - lastTouchT > 500){
+        scroller.scrollTo({top:0, behavior:'smooth'});
         park();
       }
       repark();
