@@ -992,16 +992,13 @@
   // restOff px down = mid-screen (seen on video during a swipe-dismiss). The release below
   // covers the case where the close does not actually follow.
   searchInput.addEventListener('blur', ()=>{
-    // With the touchstart-time focus scroll, a keyboard episode normally has NO pan at all —
-    // that absence is what disarmed the dismissal flash. A pan-less close is height-only:
-    // fixed and sticky agree at every frame, so there is nothing to shepherd — hand the bar
-    // straight back to sticky here and now. This is also the rubber-band fix: a finger-down
-    // scroll around the boundary blurs within its first 8px (swipe-to-dismiss), so the whole
-    // drag used to happen inside the closing hold, whose per-frame top:=naturalTop() rewrite
-    // trails the compositor by a frame — that lag under the finger WAS the rubber. Sticky
-    // rides the same drag natively. The fixed hold below remains for any close that does
-    // arrive with a pan to unwind.
-    if(Math.max(0, Math.round(vv.offsetTop)) === 0){ goSticky(); return; }
+    // NO pan-less shortcut to sticky here. An earlier version handed a pan-0 close straight
+    // back to sticky at the blur — and iOS's intermittent mid-close sticky breakage (an old
+    // measured fact of this bar) made the dismissal flicker SOMETIMES: whenever iOS happened
+    // to mis-composite the sticky bar during the close animation. The fixed hold below is
+    // deterministic instead: with pan 0 its per-frame write is a constant '0px' — flush in
+    // both fixed regimes for the whole height-only close, immune even to iOS freezing JS —
+    // and the bar goes back to sticky only once the keyboard is fully gone.
     // Pin if we are not already: the bar is now left plain sticky whenever its flow slot is on
     // screen, so a dismiss can start from the unpinned state — and iOS breaks sticky on the
     // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
