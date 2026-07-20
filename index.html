@@ -877,6 +877,7 @@
   // so that was a layout change every frame while scrolling. Asymmetry fixes it, and it is the
   // safe asymmetry: sticky is the mode that costs nothing, so drifting toward it during a
   // gesture is free. The first unpin of a drag simply holds until the finger lifts.
+  let closeRef = null;   // viewport state at blur; see the blur handler
   let touching = false;
   const endTouch = ()=>{ touching = false; };
   document.addEventListener('touchstart', ()=>{ touching = true; }, {passive:true, capture:true});
@@ -895,7 +896,7 @@
   const PAN_EPS = 24;
   const goSticky = ()=>{
     if(!pinned) return;
-    pinned=false; closing=false; panHold=false;
+    pinned=false; closing=false; panHold=false; closeRef=null;
     searchbarEl.classList.remove('pinned');
     searchbarEl.style.top = '';           // back to the CSS sticky top:0
     scrollAnchorEl.style.height = '0';
@@ -927,12 +928,17 @@
   // restOff px down = mid-screen (seen on video during a swipe-dismiss). The release below
   // covers the case where the close does not actually follow.
   searchInput.addEventListener('blur', ()=>{
-    // Pin if we are not already: the bar is now left plain sticky whenever its flow slot is on
-    // screen, so a dismiss can start from the unpinned state — and iOS breaks sticky on the
-    // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
-    // so set it after.
-    if(!pinned) pinFixed(panOffset());
-    closing=true; searchbarEl.style.top=naturalTop()+'px';
+    // Arm the hold, but do NOT pin yet — wait until the keyboard actually starts moving.
+    // blur fires on the first touchmove of a dismissing swipe, while iOS defers the close
+    // until the finger lifts. Pinning here meant the bar was position:fixed for the whole
+    // scroll that followed, and a fixed element drifts with the scroll on the compositor and
+    // snaps back: measured barTop alternating -10/0, -20/0, -30/0 on consecutive frames at the
+    // same scroll offset. That drift IS the mid-scroll jitter. Sticky does not drift, so stay
+    // sticky until there is a real close to protect against; closeRef is what "real" is judged
+    // against, and onChange does the judging since it fires exactly when the viewport moves.
+    closeRef = { off: Math.round(vv.offsetTop), vh: Math.round(vv.height) };
+    closing=true;
+    if(pinned) searchbarEl.style.top=naturalTop()+'px';
     // Restart the stillness count. It measures "the viewport is not moving, so no close is
     // actually happening" — but before the blur the viewport had been at rest with the keyboard
     // up, so the count was already way past the threshold and the safety net fired on the very
@@ -1087,7 +1093,15 @@
       // visual-relative assumption while it was still layout-relative, shifting it a few px —
       // a thin gap, only while scrolling down, and only when the toolbar transition coincides.
       // A real bounce reaches ~200px, so requiring PAN_EPS costs it nothing.
-      if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
+      // A close was armed by blur and the viewport has now genuinely started to move, so the
+      // hold is needed from here. Pin and let trackTop keep it at the flush spot.
+      if(closing && !pinned && closeRef &&
+         (Math.abs(Math.round(vv.offsetTop)-closeRef.off) > 2 ||
+          Math.abs(Math.round(vv.height)-closeRef.vh) > 2)){
+        pinFixed(panOffset()); closing=true; stillFrames=0;
+        searchbarEl.style.top=naturalTop()+'px';
+      }
+      else if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
       else if(!touching && !pinned && keyboardUp() && panOffset() > 0 && naturalTop()<=PIN_AT) pinFixed(panOffset());
