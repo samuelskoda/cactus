@@ -1013,7 +1013,15 @@
       // tripped in that dead time and snapped the bar down by offsetTop for a frame, right
       // before the close began — the jump when using the checkmark. A real close always gets
       // moving well within 1s, so only past that does stillness really mean nothing is coming.
-      if(keyboardUp() && stillFrames>=60){
+      // 240 frames (~4s), not 60. The dead time before iOS starts animating a tap-dismiss was
+      // measured at 41-50 frames on the simulator and is longer on a real first dismiss of a
+      // session — close enough to 60 that this net was firing DURING a normal close. Its remedy
+      // is the worst possible value there: it restores top = offsetTop, which is right only
+      // while the keyboard is stably up, and the close then flips fixed to visual-relative, so
+      // the bar lands offsetTop px DOWN the screen. That is the drop to mid-screen, and it only
+      // showed on the first dismiss because only that one sits still long enough to trip it.
+      // The net still recovers a genuinely stuck blur, just after 4s rather than 1.
+      if(keyboardUp() && stillFrames>=240){
         closing=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
         searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
