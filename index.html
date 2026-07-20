@@ -946,14 +946,27 @@
     // count has to start from the blur, since only stillness AFTER it means anything.
     stillFrames=0;
   });
-  let trackRaf=0, lastOff=-1, lastVH=-1, stillFrames=0;
+  let trackRaf=0, lastOff=-1, lastVH=-1, stillFrames=0, lastSy=-1;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
     const off=Math.max(0,Math.round(vv.offsetTop));
+    const sy=Math.round(window.scrollY), scrolling = sy!==lastSy; lastSy=sy;
     // Stillness means the viewport is not moving in ANY way, so height counts too: a keyboard
     // close can restore vv.height while offsetTop holds, and that is motion, not stillness.
     const vh=Math.round(vv.height);
     if(off===lastOff && vh===lastVH) stillFrames++; else { stillFrames=0; lastOff=off; lastVH=vh; }
+    // A pin only earns its keep while the viewport is moving or is standing panned. If the
+    // viewport has been still for several frames, the PAGE is scrolling instead, and there is no
+    // pan left worth correcting, then the pin is fixing nothing and being fixed costs drift — the
+    // compositor carries a fixed element along with the scroll and snaps it back, which is the
+    // jitter. Sticky does not drift, so hand back.
+    // This is a catch-all for pins that outlive their reason. Each exit below demands offsetTop
+    // return to EXACTLY 0, and a Safari toolbar transition can leave a few px behind — enough to
+    // strand the bar fixed for every later scroll, which is the kind of thing that shows up only
+    // "sometimes". `closing` is excluded so the keyboard-close hold is never cut short, and a
+    // standing pan (panOffset >= PAN_EPS) keeps its pin because sticky genuinely cannot cope
+    // with one.
+    if(!closing && scrolling && stillFrames>=6 && panOffset()<PAN_EPS){ goSticky(); trackRaf=0; return; }
     // Slot back on screen (scrolling UP toward the header): the bar belongs in the flow, and
     // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
     // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
