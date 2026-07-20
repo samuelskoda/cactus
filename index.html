@@ -321,7 +321,7 @@
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
      index.html — a stale data.js here previously broke photo paths and clicks -->
-<script src="data.js?v=12"></script>
+<script src="data.js?v=13"></script>
 <script>
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
@@ -630,18 +630,9 @@
     addEventListener('wheel', claim, opts);
     addEventListener('touchstart', claim, opts);
     addEventListener('keydown', claim, opts);
-    // Land a hair PAST the slot, not exactly on it. naturalTop() is max(0, anchorTop), so the
-    // negative side is clamped to 0 and the positive side is not — which is the whole asymmetry
-    // between the two directions. Focusing from BELOW scrolls up and overshoots into the clamped
-    // side, so the slot always reads 0 and the bar always pins; focusing from ABOVE scrolls down
-    // and can stop a couple of px short, leaving the slot positive, so the bar never pins and the
-    // dismiss then starts from sticky, which is broken during a close and drops the bar. Two px
-    // of overshoot puts the downward case on the same forgiving side as the upward one. It is
-    // invisible: at or past the slot, both sticky and the pin place the bar at the top anyway.
-    const OVERSHOOT = 2;
     const doScroll=()=>{
       if(takenOver) return;
-      const target = window.scrollY + anchor.getBoundingClientRect().top + OVERSHOOT;
+      const target = window.scrollY + anchor.getBoundingClientRect().top;
       window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
     };
     doScroll();
@@ -872,39 +863,11 @@
   // literally >0 let a 1-3px rounding/stale read flap the bar to plain sticky while the keyboard
   // was up — the state where iOS sticky is unreliable — and that is the regime a *tiny* scroll
   // sits in. A few px of hysteresis keeps the pin until the slot has really moved.
-  // Hysteresis needs TWO thresholds. One boundary used for both directions is just an edge:
-  // hold a drag so the slot hovers on it and the bar flips pinned<->sticky every frame, each
-  // flip toggling the .pinned class and the anchor's height, so a layout change per frame. That
-  // churn is felt as a slight rubber band right around the bar's resting place. Pin only once
-  // the slot is genuinely at the top, release only well after it has left, and keep whatever
-  // mode we are already in between the two — biased toward sticky, which is the free one.
-  // Re-pinning is a discrete decision and belongs to the settle, never to the middle of a
-  // gesture. Unpinning mid-drag has to stay allowed — it is how the bar stops chasing once its
-  // slot comes into view — but allowing BOTH mid-drag let them fight: trackTop unpins the frame
-  // offsetTop reads 0, onChange re-pins the frame it reads 1, and the compositor wobbles it by
-  // about that much under a moving finger. Each flip toggles a class and the anchor's height,
-  // so that was a layout change every frame while scrolling. Asymmetry fixes it, and it is the
-  // safe asymmetry: sticky is the mode that costs nothing, so drifting toward it during a
-  // gesture is free. The first unpin of a drag simply holds until the finger lifts.
-  let closeRef = null;   // viewport state at blur; see the blur handler
-  let touching = false;
-  const endTouch = ()=>{ touching = false; };
-  document.addEventListener('touchstart', ()=>{ touching = true; }, {passive:true, capture:true});
-  // When the page last actually moved. This, not finger-down, is what separates a swipe dismiss
-  // from a tap dismiss: tapping the keyboard's checkmark IS a touch, and blur fires while the
-  // finger is still down, so `touching` called every tap a swipe and skipped the pin it needed.
-  let lastScrollAt = -1e9;
-  addEventListener('scroll', ()=>{ lastScrollAt = performance.now(); }, {passive:true, capture:true});
-  const pageMoving = ()=> (performance.now() - lastScrollAt) < 150;
-  document.addEventListener('touchend',    endTouch, {passive:true, capture:true});
-  document.addEventListener('touchcancel', endTouch, {passive:true, capture:true});
-  const PIN_AT   = 12;  // slot within this of the top -> pin. Generous on purpose: a scroll that
-                        // stops short must still pin, because not pinning loses the close hold.
-  const UNPIN_AT = 20;  // slot further than this below -> hand back to sticky (must exceed PIN_AT)
-  // These govern the swap DECISION only — never where the bar is placed. Placement always
+  const STICK_EPS = 4;
+  // STICK_EPS governs the swap DECISION only — never where the bar is placed. Placement always
   // uses the true naturalTop(), so the pinned position and the sticky position are the same
   // number and swapping between them moves nothing. Rounding the placement down to 0 inside the
-  // threshold made the two disagree by up to that threshold: releasing the pin dropped it onto
+  // threshold made the two disagree by up to STICK_EPS: releasing the pin dropped the bar onto
   // its real slot (a flash slightly below), and taking the pin lifted it out from under a caret
   // iOS had already drawn (the cursor sitting slightly above the field).
   // How far offsetTop must leave its resting value to count as a real viewport pan rather than
@@ -912,7 +875,7 @@
   const PAN_EPS = 24;
   const goSticky = ()=>{
     if(!pinned) return;
-    pinned=false; closing=false; panHold=false; closeRef=null;
+    pinned=false; closing=false; panHold=false;
     searchbarEl.classList.remove('pinned');
     searchbarEl.style.top = '';           // back to the CSS sticky top:0
     scrollAnchorEl.style.height = '0';
@@ -944,41 +907,12 @@
   // restOff px down = mid-screen (seen on video during a swipe-dismiss). The release below
   // covers the case where the close does not actually follow.
   searchInput.addEventListener('blur', ()=>{
-    // Arm the hold, but do NOT pin yet — wait until the keyboard actually starts moving.
-    // blur fires on the first touchmove of a dismissing swipe, while iOS defers the close
-    // until the finger lifts. Pinning here meant the bar was position:fixed for the whole
-    // scroll that followed, and a fixed element drifts with the scroll on the compositor and
-    // snaps back: measured barTop alternating -10/0, -20/0, -30/0 on consecutive frames at the
-    // same scroll offset. That drift IS the mid-scroll jitter. Sticky does not drift, so stay
-    // sticky until there is a real close to protect against; closeRef is what "real" is judged
-    // against, and onChange does the judging since it fires exactly when the viewport moves.
-    closeRef = { off: Math.round(vv.offsetTop), vh: Math.round(vv.height) };
-    closing=true;
-    // Whether to pin NOW depends on how the dismiss was made, and the two cases want opposites.
-    //   tap dismiss (checkmark, or a tap outside) — nothing is scrolling, so pinning costs no
-    //     drift, and waiting costs a lot: sticky breaks the instant the close begins and the bar
-    //     falls to mid-screen for a frame, which is the flick downwards. Pin immediately.
-    //   swipe dismiss — the page IS scrolling, and a pinned bar is position:fixed, which the
-    //     compositor drags along with the scroll and snaps back. That is the mid-scroll jitter.
-    //     Stay sticky and let onChange pin once the viewport actually starts to move.
-    // Told apart by whether the PAGE is moving. A swipe dismiss is scrolling when blur lands; a
-    // tap dismiss is not, however much finger is on the glass.
-    if(pageMoving()){
-      // Swipe dismiss: the page is scrolling, and a pinned bar is position:fixed, which the
-      // compositor drags along and snaps back — the mid-scroll jitter. Sticky does not drift, so
-      // hand back for the scroll and let onChange re-pin once the viewport genuinely moves.
-      // goSticky clears the arming, so re-arm after it.
-      goSticky();
-      closeRef = { off: Math.round(vv.offsetTop), vh: Math.round(vv.height) };
-      closing = true;
-    } else {
-      // Tap dismiss: nothing is scrolling, so hold from here. The bar is normally already pinned
-      // by the invariant above; this covers the case where it is not.
-      if(!pinned) pinFixed(panOffset());
-      closing=true;            // pinFixed clears it
-      stillFrames=0;
-    }
-    if(pinned) searchbarEl.style.top=naturalTop()+'px';
+    // Pin if we are not already: the bar is now left plain sticky whenever its flow slot is on
+    // screen, so a dismiss can start from the unpinned state — and iOS breaks sticky on the
+    // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
+    // so set it after.
+    if(!pinned) pinFixed(panOffset());
+    closing=true; searchbarEl.style.top=naturalTop()+'px';
     // Restart the stillness count. It measures "the viewport is not moving, so no close is
     // actually happening" — but before the blur the viewport had been at rest with the keyboard
     // up, so the count was already way past the threshold and the safety net fired on the very
@@ -986,28 +920,14 @@
     // count has to start from the blur, since only stillness AFTER it means anything.
     stillFrames=0;
   });
-  let trackRaf=0, lastOff=-1, lastVH=-1, stillFrames=0, lastSy=-1;
+  let trackRaf=0, lastOff=-1, lastVH=-1, stillFrames=0;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
     const off=Math.max(0,Math.round(vv.offsetTop));
-    const sy=Math.round(window.scrollY), scrolling = sy!==lastSy; lastSy=sy;
-    noteVH();
     // Stillness means the viewport is not moving in ANY way, so height counts too: a keyboard
     // close can restore vv.height while offsetTop holds, and that is motion, not stillness.
     const vh=Math.round(vv.height);
     if(off===lastOff && vh===lastVH) stillFrames++; else { stillFrames=0; lastOff=off; lastVH=vh; }
-    // A pin only earns its keep while the viewport is moving or is standing panned. If the
-    // viewport has been still for several frames, the PAGE is scrolling instead, and there is no
-    // pan left worth correcting, then the pin is fixing nothing and being fixed costs drift — the
-    // compositor carries a fixed element along with the scroll and snaps it back, which is the
-    // jitter. Sticky does not drift, so hand back.
-    // This is a catch-all for pins that outlive their reason. Each exit below demands offsetTop
-    // return to EXACTLY 0, and a Safari toolbar transition can leave a few px behind — enough to
-    // strand the bar fixed for every later scroll, which is the kind of thing that shows up only
-    // "sometimes". `closing` is excluded so the keyboard-close hold is never cut short, and a
-    // standing pan (panOffset >= PAN_EPS) keeps its pin because sticky genuinely cannot cope
-    // with one.
-    if(!closing && scrolling && stillFrames>=6 && panOffset()<PAN_EPS){ goSticky(); trackRaf=0; return; }
     // Slot back on screen (scrolling UP toward the header): the bar belongs in the flow, and
     // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
     // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
@@ -1018,21 +938,13 @@
     // sticky to get wrong. Excluding `closing` here meant an up-swipe (which both dismisses and
     // scrolls) stayed pinned and chased the slot — measured barTop trailing anchorTop by one
     // frame the whole way, which is exactly the jitter.
-    if(naturalTop() > UNPIN_AT){ goSticky(); trackRaf=0; return; }
+    if(naturalTop() > STICK_EPS){ goSticky(); trackRaf=0; return; }
     // Two different reasons to hold top:0, with different exits — conflating them broke both.
     // `closing`: a blur fired, the keyboard is on its way out. Hold until it is fully gone. It
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
     // start, and releasing there is what put the bar mid-screen.
     if(closing){
-      // Hand back only once the viewport has genuinely STOPPED, never on keyboardUp() alone.
-      // That test compares innerHeight against vv.height, and mid-close the two shrink together,
-      // so it reads false while the keyboard is still on screen: traced unpinning at vvH 377 and
-      // the keyboard only finishing at vvH 714, a good 260ms later. Sticky is broken in exactly
-      // that window, so the bar dropped and then recovered once the layout settled — the flick
-      // downwards when dismissing with the checkmark. A close animates the viewport nearly every
-      // frame, so stillness is the honest signal that it is over; 10 frames is ~165ms, longer
-      // than any pause within the animation but short enough not to hold the pin around.
-      if(!keyboardUp() && off===0 && stillFrames>=10){ goSticky(); trackRaf=0; return; }
+      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       // Safety net only: blurred but the keyboard never actually left (iOS can keep it up).
       // The threshold has to be generous, because "still" does NOT mean "no close is coming":
       // after a tap-dismiss (the keyboard's own Done/checkmark) iOS leaves offsetTop AND
@@ -1040,15 +952,7 @@
       // tripped in that dead time and snapped the bar down by offsetTop for a frame, right
       // before the close began — the jump when using the checkmark. A real close always gets
       // moving well within 1s, so only past that does stillness really mean nothing is coming.
-      // 240 frames (~4s), not 60. The dead time before iOS starts animating a tap-dismiss was
-      // measured at 41-50 frames on the simulator and is longer on a real first dismiss of a
-      // session — close enough to 60 that this net was firing DURING a normal close. Its remedy
-      // is the worst possible value there: it restores top = offsetTop, which is right only
-      // while the keyboard is stably up, and the close then flips fixed to visual-relative, so
-      // the bar lands offsetTop px DOWN the screen. That is the drop to mid-screen, and it only
-      // showed on the first dismiss because only that one sits still long enough to trip it.
-      // The net still recovers a genuinely stuck blur, just after 4s rather than 1.
-      if(keyboardUp() && stillFrames>=240){
+      if(keyboardUp() && stillFrames>=60){
         closing=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
         searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
@@ -1061,8 +965,7 @@
     // the bar parked offsetTop above the screen while the viewport kept twitching during a
     // keyboard-up scroll — that is the "bar disappears" report.
     if(panHold){
-      // Same reasoning as the closing hold: wait for the viewport to genuinely stop.
-      if(!keyboardUp() && off===0 && stillFrames>=10){ goSticky(); trackRaf=0; return; }
+      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
         panHold=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
@@ -1078,15 +981,6 @@
     // holding the fixed pin through the whole close is safe (no scroll to drift against).
     // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
     // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
-    // No pan left to correct AND no keyboard: only then is sticky right again. The keyboard
-    // guard is essential, not incidental. offsetTop returns to 0 early in a close, so without it
-    // this unpins mid-close — and sticky is broken exactly there, which drops the bar to
-    // mid-screen. It only bit on the FIRST dismiss of a session: that one has a longer dead time
-    // before iOS animates, long enough for the 60-frame net above to clear `closing` and drop
-    // through to here. Later dismisses never sat still that long, which is why it looked
-    // like a first-time-only fault.
-    // It does not reintroduce chasing: with off 0 and the slot at the top, top is a constant,
-    // and a slot that scrolls into view is handled by UNPIN_AT above.
     if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
     // offsetTop has left its resting value => the viewport has STARTED panning: the keyboard
     // is being dragged away by iOS's native scroll-to-dismiss (or is closing). iOS switches
@@ -1109,20 +1003,7 @@
   };
   let scrollAfterSettle=false;   // see the searchClose handler
   // keyboard up = the layout is (or is about to be) in its shifted state
-  // "Is the keyboard up" judged against the TALLEST viewport ever seen, not against
-  // innerHeight. Comparing the two is unreliable mid-close: iOS shrinks innerHeight to match the
-  // keyboard-up viewport partway through, so the test flips to false while the keyboard is still
-  // on screen. Traced pinning at vvH 377 with innerHeight 714 (up), then unpinning at the very
-  // same vvH 377 once innerHeight had followed it down — and sticky is broken in that window, so
-  // the bar dropped and recovered, which is the flick when dismissing with the checkmark. The
-  // tallest height seen is the no-keyboard height and does not move under us. Both tests are
-  // kept, either being enough, so a first frame before fullVH is seeded still behaves.
-  let fullVH = vv ? Math.round(vv.height) : 0;
-  const noteVH = ()=>{ if(vv) fullVH = Math.max(fullVH, Math.round(vv.height)); };
-  const keyboardUp = ()=> !!vv && (
-    (window.innerHeight - vv.height) > 120 ||
-    (fullVH - vv.height) > 120
-  );
+  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
   if(vv){
     let settleTimer=null, armedScrollY=0;
     function arm(){
@@ -1149,39 +1030,12 @@
       // ...but only once the flow slot is scrolled past. If the slot is still on screen the
       // bar's correct place IS its flow position, which sticky gives natively — pinning there
       // means chasing it per frame, which jitters.
-      // Pin ONLY when there is a pan to correct. With offsetTop 0 — the usual case, since the
-      // instant focus scroll means iOS never has to pan — sticky already puts the bar exactly
-      // where it belongs, natively and on the compositor. Pinning there buys nothing and costs
-      // a per-frame write plus a mode that can swap as the slot drifts across the thresholds,
-      // and THAT is the slight rubber band felt when dragging around the bar's resting place.
-      // Widening the thresholds only made the swap rarer; not pinning removes it. The close is
-      // still covered, because blur pins before the keyboard starts moving.
-      // Between the thresholds neither branch fires and the current mode persists.
-      // Never touch the bar while a close is in flight — trackTop owns the hold until the
-      // keyboard is really gone. offsetTop returns to 0 partway through a close, well before
-      // the keyboard finishes, so this branch used to fire ~120ms in and hand the bar back to
-      // sticky mid-close: traced unpinning at vvH 377 with the keyboard still up and only
-      // reaching 714 nearly 300ms later. Sticky is broken in that window, so the bar dropped
-      // and then recovered — the flick downwards when dismissing with the checkmark.
-      if(closing){ /* the hold is trackTop's to release */ }
-      // INVARIANT: field focused and keyboard up => the bar is pinned. The close hold depends on
-      // it, because a dismiss that begins from sticky drops the bar — sticky is broken while the
-      // keyboard animates away. "Only pin when there is a pan" broke exactly this: whether iOS
-      // pans depends on how far it had to move the field, which depends on which way the focus
-      // scroll went, so the bar was protected when focus scrolled UP to the bar and unprotected
-      // when it scrolled DOWN. That is the direction-dependence reported, and no amount of
-      // tuning the dismiss could fix it, because the fault was already set by then.
-      else if(document.activeElement === searchInput && keyboardUp()){
-        if(!pinned) pinFixed(panOffset());
-      }
-      else if(!keyboardUp() || panOffset() === 0) goSticky();
-      else if(naturalTop() <= PIN_AT) pinFixed(panOffset());
-      else if(naturalTop() > UNPIN_AT) goSticky();
+      if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
+      else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      noteVH();
       // A viewport pan with NO keyboard is a rubber-band bounce (the bottom one stretches
       // offsetTop to ~215 and eases it back). Sticky slides away with the content during it,
       // so pin and track the pan — top:=offsetTop holds the bar flush the whole bounce.
@@ -1201,18 +1055,10 @@
       // visual-relative assumption while it was still layout-relative, shifting it a few px —
       // a thin gap, only while scrolling down, and only when the toolbar transition coincides.
       // A real bounce reaches ~200px, so requiring PAN_EPS costs it nothing.
-      // A close was armed by blur and the viewport has now genuinely started to move, so the
-      // hold is needed from here. Pin and let trackTop keep it at the flush spot.
-      if(closing && !pinned && closeRef &&
-         (Math.abs(Math.round(vv.offsetTop)-closeRef.off) > 2 ||
-          Math.abs(Math.round(vv.height)-closeRef.vh) > 2)){
-        pinFixed(panOffset()); closing=true; stillFrames=0;
-        searchbarEl.style.top=naturalTop()+'px';
-      }
-      else if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
+      if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
-      else if(!touching && !pinned && keyboardUp() && panOffset() > 0 && naturalTop()<=PIN_AT) pinFixed(panOffset());
+      else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
