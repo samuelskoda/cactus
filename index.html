@@ -938,6 +938,19 @@
     // against, and onChange does the judging since it fires exactly when the viewport moves.
     closeRef = { off: Math.round(vv.offsetTop), vh: Math.round(vv.height) };
     closing=true;
+    // Whether to pin NOW depends on how the dismiss was made, and the two cases want opposites.
+    //   tap dismiss (checkmark, or a tap outside) — nothing is scrolling, so pinning costs no
+    //     drift, and waiting costs a lot: sticky breaks the instant the close begins and the bar
+    //     falls to mid-screen for a frame, which is the flick downwards. Pin immediately.
+    //   swipe dismiss — the page IS scrolling, and a pinned bar is position:fixed, which the
+    //     compositor drags along with the scroll and snaps back. That is the mid-scroll jitter.
+    //     Stay sticky and let onChange pin once the viewport actually starts to move.
+    // `touching` tells them apart: blur arrives mid-gesture for a swipe, between gestures for a tap.
+    if(!touching){
+      if(!pinned) pinFixed(panOffset());
+      closing=true;            // pinFixed clears it
+      stillFrames=0;
+    }
     if(pinned) searchbarEl.style.top=naturalTop()+'px';
     // Restart the stillness count. It measures "the viewport is not moving, so no close is
     // actually happening" — but before the blur the viewport had been at rest with the keyboard
