@@ -869,6 +869,19 @@
   // churn is felt as a slight rubber band right around the bar's resting place. Pin only once
   // the slot is genuinely at the top, release only well after it has left, and keep whatever
   // mode we are already in between the two — biased toward sticky, which is the free one.
+  // Re-pinning is a discrete decision and belongs to the settle, never to the middle of a
+  // gesture. Unpinning mid-drag has to stay allowed — it is how the bar stops chasing once its
+  // slot comes into view — but allowing BOTH mid-drag let them fight: trackTop unpins the frame
+  // offsetTop reads 0, onChange re-pins the frame it reads 1, and the compositor wobbles it by
+  // about that much under a moving finger. Each flip toggles a class and the anchor's height,
+  // so that was a layout change every frame while scrolling. Asymmetry fixes it, and it is the
+  // safe asymmetry: sticky is the mode that costs nothing, so drifting toward it during a
+  // gesture is free. The first unpin of a drag simply holds until the finger lifts.
+  let touching = false;
+  const endTouch = ()=>{ touching = false; };
+  document.addEventListener('touchstart', ()=>{ touching = true; }, {passive:true, capture:true});
+  document.addEventListener('touchend',    endTouch, {passive:true, capture:true});
+  document.addEventListener('touchcancel', endTouch, {passive:true, capture:true});
   const PIN_AT   = 1;   // slot within this of the top -> pin
   const UNPIN_AT = 8;   // slot further than this below -> hand back to sticky
   // These govern the swap DECISION only — never where the bar is placed. Placement always
@@ -1077,7 +1090,7 @@
       if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
-      else if(!pinned && keyboardUp() && panOffset() > 0 && naturalTop()<=PIN_AT) pinFixed(panOffset());
+      else if(!touching && !pinned && keyboardUp() && panOffset() > 0 && naturalTop()<=PIN_AT) pinFixed(panOffset());
       // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
       // Just keep the settle timer armed so onSettled fires when everything stops.
       arm();
