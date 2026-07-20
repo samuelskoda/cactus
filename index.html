@@ -7,7 +7,7 @@
      then keeps working natively — no JS repositioning (and none of its lag/stutter,
      since iOS pans the viewport on the compositor thread, ahead of JS events).
      Browsers without support ignore it and use the JS fallback pinning. -->
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>My Cactus Collection</title>
 <style>
   :root{
@@ -23,41 +23,6 @@
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth;overflow-anchor:none}
-  /* The page scrolls in an INNER container, never on the root. Everything that plagued
-     the sticky search bar lived on the root scroller and only there: iOS saves the root
-     scroll position when a tap begins and restores it at keyboard-show (measured resetting
-     scrollY 354 -> 0 and re-scrolling from stale geometry); that stale reveal pans the
-     visual viewport (offsetTop 337); and during a checkmark dismissal iOS freezes JS for
-     ~400ms while it animates that pan away — dragging any position:fixed element down the
-     screen with it, which was the bar sliding to mid-screen with no JS able to intervene.
-     An inner scroller has none of those behaviors: nothing to save or restore, the focused
-     field sits at the container top so there is nothing to reveal (no pan), and sticky
-     inside a non-root scroller keeps working through keyboard transitions. This replaces
-     the whole pin-to-fixed machinery, which is gone. */
-  html,body{height:100%;overflow:hidden}
-  /* No overscroll containment: when #pageScroll is at its top, a continued pull chains to
-     the root, and the root is what Safari's native pull-to-refresh lives on. The chained
-     overscroll drags the whole composition (bar included) exactly like a normal page. */
-  /* 100lvh, not 100dvh: dvh stops at Safari's bottom chrome, leaving a flat opaque band
-     under the toolbar and home indicator where a native page shows its content through the
-     translucency. lvh reaches the physical bottom, restoring the underlap; the padding
-     lets the last content scroll clear of the chrome it now sits beneath. */
-  #pageScroll{height:100lvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-    padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 60px)}
-  /* Root gets a 2px scroll range (see the status-bar-tap hook in the JS): the iOS
-     status-bar tap scrolls THE ROOT to top, so the root must have somewhere to scroll
-     from for the tap to be observable at all. Touch devices only — on desktop the extra
-     2px would just grow a phantom scrollbar. */
-  /* visible, not auto: the viewport's scrollability must come the ordinary way (content
-     2px taller than the viewport), or WebKit gives the root a strange box that accepts
-     scrollTop=1 but silently refuses to scroll back to 0 - measured, and it made the
-     status-bar tap impossible to observe. Both html and body must be visible: with html
-     visible the viewport takes its overflow from body. */
-  html.rootnudge, html.rootnudge body{overflow:visible}
-  /* padding, not a child margin: a last-child bottom margin collapses through the body's
-     edge and leaves the root with zero scroll range (measured scrollHeight == innerHeight,
-     which silently killed the parked 1px and with it the status-bar tap) */
-  html.rootnudge body{height:auto;padding-bottom:2px}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   a{color:var(--accent)}
@@ -80,10 +45,14 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* Sticky against #pageScroll, not the root. iOS's keyboard-time sticky breakage (measured
-     barTop -1322 with the bar "stuck": the bar scrolled away with the page) is specific to
-     the ROOT scroller; inside an inner scroller sticky holds through keyboard transitions,
-     which is a large part of why the page scrolls in #pageScroll at all. */
+  /* While the keyboard is open, iOS Safari breaks position:sticky — the bar stops sticking
+     and scrolls off with the page (measured: barTop -1322 at scrollY 1622, offsetTop 0,
+     visualViewport height 362 vs layout 739). position:fixed does NOT have this bug, and
+     because the viewport isn't panned (offsetTop 0) fixed;top:0 lands exactly at the screen
+     top. We only pin while the keyboard is engaged — by then focus has already scrolled the
+     bar to the top and the header is off-screen, so fixed;top:0 doesn't cover anything. The
+     #scrollAnchor above reserves the bar's flow height meanwhile so nothing jumps. */
+  .searchbar.pinned{position:fixed;top:0;left:0;right:0;margin-bottom:0}
   /* Frosted glass on a dedicated child layer rather than on the bar itself: a blur on the
      sticky bar went stale after the keyboard resized the visual viewport and flickered on
      every later scroll; this div isn't sticky, which is what fixed that.
@@ -210,7 +179,7 @@
   .modal{position:fixed;inset:0;z-index:60;display:none;justify-content:center;align-items:flex-start;
     padding:20px;background:rgba(20,18,12,.6);overflow-y:auto;-webkit-overflow-scrolling:touch}
   .modal.open{display:flex}
-  body.noscroll #pageScroll{overflow:hidden}
+  body.noscroll{overflow:hidden}
   .sheet{position:relative;background:var(--panel);border-radius:16px;max-width:900px;width:100%;
     margin:auto;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1fr}
   .sheet .info{padding:26px 26px 30px;position:relative}
@@ -298,7 +267,6 @@
 </style>
 </head>
 <body>
-<div id="pageScroll">
 <header class="hero">
   <button class="langswitch" id="langSwitch" type="button"></button>
   <div class="wrap">
@@ -341,15 +309,14 @@
   <div class="grid" id="grid"></div>
 </main>
 
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="sheet" id="sheet"></div>
+</div>
+
 <footer class="wrap" data-i18n="footer">
   Identifications are best-effort and not authoritative — some are uncertain and may be wrong.
 </footer>
 <div id="scrollPad" style="height:0"></div>
-</div><!-- /pageScroll -->
-
-<div class="modal" id="modal" role="dialog" aria-modal="true">
-  <div class="sheet" id="sheet"></div>
-</div>
 
 <!-- cache-bust: bump this ?v= on every deploy that touches data.js, so browsers
      (Safari in particular caches aggressively) never run it against a mismatched
@@ -359,49 +326,6 @@
   const data = window.CACTI;
   const wiki = window.GENUS_WIKI || {};
   const grid = document.getElementById('grid');
-  const scroller = document.getElementById('pageScroll');   // the page scroller — the root scrolls only a 2px stub
-  // iOS's status-bar tap scrolls the ROOT scroller to the top — it cannot see #pageScroll.
-  // So the root keeps a 2px scroll range, PARKED at 1: the tap scrolls it 1 -> 0, that
-  // fires a root scroll event (the only thing that ever scrolls the root besides overscroll
-  // chaining), and this hook forwards the intent to the real scroller. Touch-gated because
-  // a pull-to-refresh spring-back also lands the root on 0 — but that always happens within
-  // moments of a touch, while a status-bar tap involves no touch events at all.
-  if(navigator.maxTouchPoints > 0){
-    document.documentElement.classList.add('rootnudge');
-    const rootEl = document.scrollingElement;
-    let lastTouchT = -1e9, parkT = null;
-    const touched = ()=>{ lastTouchT = performance.now(); };
-    addEventListener('touchstart', touched, {passive:true});
-    addEventListener('touchend', touched, {passive:true});
-    const park = ()=>{ if(rootEl.scrollTop < 1) rootEl.scrollTop = 1; };
-    // Anything can knock the root off its 1px perch and leave it at 0 — the keyboard-show
-    // restore does exactly that, and while the keyboard is up iOS IGNORES programmatic root
-    // scrolls, so a single delayed re-park can silently fail with nothing left to retry
-    // (measured: root stuck at 0, tap hook dead). So re-park after every signal that ends
-    // such an episode: root scrolls, touch ends, and keyboard/viewport changes.
-    const repark = ()=>{ clearTimeout(parkT); parkT = setTimeout(park, 600); };
-    requestAnimationFrame(park);
-    addEventListener('touchend', repark, {passive:true});
-    // A stranded root (0, unparked — e.g. after a PTR spring-back, where every delayed
-    // re-park was refused) re-arms HERE, on the next finger-down: before any scrolling has
-    // begun, so it cannot interfere with an overscroll that hasn't started, and early
-    // enough that the very gesture that follows can already be measured against a parked
-    // root.
-    addEventListener('touchstart', park, {passive:true});
-    if(window.visualViewport) window.visualViewport.addEventListener('resize', repark);
-    addEventListener('scroll', ()=>{                    // root scrolls only; element scrolls don't reach window
-      // The 500ms gate excludes a PTR spring-back (which lands on 0 within moments of its
-      // touch); longer gates ate genuine taps made right after scrolling. The park shares
-      // the gate: in-dispatch parks are ACCEPTED even mid-gesture (they are how the tap
-      // re-arms at all), so an ungated park during a pull kept yanking the root back to 1
-      // and iOS re-crossed the PTR threshold — the multiple-refresh pull.
-      if(rootEl.scrollTop === 0 && performance.now() - lastTouchT > 500){
-        scroller.scrollTo({top:0, behavior:'smooth'});
-        park();
-      }
-      repark();
-    }, {passive:true});
-  }
   const state = { q:"", region:null, genus:null, tentative:false, flower:false };
 
   const uniq = (arr)=>[...new Set(arr)];
@@ -629,9 +553,9 @@
     if(!pad) return;
     const currentPad = pad.offsetHeight;
     const gridHeight = grid.offsetHeight;
-    const otherHeight = (scroller.scrollHeight - currentPad) - gridHeight;
+    const otherHeight = (document.documentElement.scrollHeight - currentPad) - gridHeight;
     // assume the grid could shrink all the way to nothing — a safe upper bound
-    const worstCaseNeeded = scroller.scrollTop + scroller.clientHeight - otherHeight;
+    const worstCaseNeeded = window.scrollY + window.innerHeight - otherHeight;
     if(worstCaseNeeded > currentPad) pad.style.height = worstCaseNeeded + 'px';
   }
   let trimPadTimer=null;
@@ -639,8 +563,8 @@
     const pad=document.getElementById('scrollPad'), anchor=document.getElementById('scrollAnchor');
     if(!pad || !anchor) return;
     const currentPad = pad.offsetHeight;
-    const contentHeight = scroller.scrollHeight - currentPad;
-    const minimal = Math.max(0, anchor.offsetTop + scroller.clientHeight - contentHeight);
+    const contentHeight = document.documentElement.scrollHeight - currentPad;
+    const minimal = Math.max(0, anchor.offsetTop + window.innerHeight - contentHeight);
     if(minimal !== currentPad) pad.style.height = minimal + 'px';
   }
 
@@ -687,6 +611,15 @@
   // only one filter may be active at a time
   function clearFilters(){ state.region=null; state.genus=null; state.tentative=false; state.flower=false; }
   // scroll so the sticky search bar sits at the top with the first result just below it
+  // True from the moment a focus scroll starts until it has actually landed. The pin/sticky
+  // decision in onSettled() reads the flow slot live, and it is armed by scroll AND resize
+  // events - which the keyboard's own arrival generates. So the decision races the focus
+  // scroll, and whichever arrives first picks the answer. Win the race (measured: the scroll
+  // lands ~390ms before the keyboard here) and the slot reads its settled value; lose it and
+  // the decision is made against a slot still hundreds of px down the page. That is why this
+  // only ever misbehaved on the FIRST focus: the second time the keyboard is already up, there
+  // is no animation, and so no race to lose.
+  let focusSettling=false, focusSettleTimer=null;
   function scrollToResults(instant){
     const anchor=document.getElementById('scrollAnchor');
     if(!anchor) return;
@@ -728,8 +661,16 @@
       if(takenOver) return;
       const delta = anchor.getBoundingClientRect().top + OVERSHOOT;
       if(force!==true && Math.abs(delta) <= SETTLE_EPS) return;   // close enough — leave it alone
-      scroller.scrollTo({top: Math.max(0, scroller.scrollTop + delta), behavior: instant===true ? 'instant' : 'smooth'});
+      window.scrollTo({top: Math.max(0, window.scrollY + delta), behavior: instant===true ? 'instant' : 'smooth'});
     };
+    // Only the focus path (instant) races the keyboard; filter/menu scrolls have no keyboard.
+    if(instant===true){
+      focusSettling=true;
+      // Hard release, so a skipped or throwing pass can never strand the flag. Stranded, the
+      // bar would stay unpinned through a keyboard close, which is the mid-screen drop.
+      clearTimeout(focusSettleTimer);
+      focusSettleTimer=setTimeout(()=>{ focusSettling=false; }, 350);
+    }
     doScroll(true);                      // the real scroll — always runs
     requestAnimationFrame(()=>doScroll());   // wrapped: rAF passes a timestamp, never `force`
     setTimeout(()=>{
@@ -737,6 +678,12 @@
       removeEventListener('wheel', claim, opts);
       removeEventListener('touchstart', claim, opts);
       removeEventListener('keydown', claim, opts);
+      // One frame later the instant scroll above has been applied, so the slot now reads its
+      // settled value and the decision is safe to make. Runs even if the user took over: then
+      // the slot is wherever they put it, which is equally a real value.
+      if(instant===true) requestAnimationFrame(()=>{
+        focusSettling=false; clearTimeout(focusSettleTimer);
+      });
     }, 120);
   }
   // menu chips: toggle this filter (clearing the others), then close the dropdown
@@ -909,9 +856,6 @@
   // was needed only because the bar was CHASING offsetTop per frame during the close; see
   // trackTop for the hold that replaces the chase and makes the single gesture viable.
   const searchRowEl = document.getElementById('searchRow');
-  // keyboard up = the visual viewport is keyboard-shrunk
-  const vv = window.visualViewport;
-  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
   let tStartY=0, tMoved=false, tOutside=false;
   document.addEventListener('touchstart', e=>{
     tOutside = (document.activeElement === searchInput && !searchRowEl.contains(e.target));
@@ -930,6 +874,273 @@
     if(tOutside && !tMoved) searchInput.blur();
   }, {passive:true});
 
+  // Keep the bar pinned under the keyboard WITHOUT per-frame JS chasing (that lag is the
+  // rubber — the content slides on the compositor and JS always follows a frame late).
+  // Instead: while the visual viewport is MOVING, leave the bar sticky so it rides the
+  // content natively (no JS, no lag — "moves with content"). Only once the viewport has
+  // SETTLED do we pin it once to fixed;top:=offsetTop, the correct resting spot. No rAF,
+  // no continuous sync. Every transition is a single reposition, never a chase.
+  const searchbarEl = document.querySelector('.searchbar');
+  const scrollAnchorEl = document.getElementById('scrollAnchor');
+  const vv = window.visualViewport;
+  // restOff = the offsetTop the bar was pinned AT while the viewport sat still. Once the live
+  // offsetTop leaves it, the viewport has started panning — see trackTop.
+  let pinned=false, closing=false, panHold=false, restOff=0;
+  // What sticky would do: the bar rests at the screen top only once its flow slot has been
+  // scrolled past. Scroll back UP toward the header and the slot comes down the screen again,
+  // and the bar must come with it. Pinning flat at 0 instead left it floating over the hero,
+  // then dropping into place the moment the pin released — the jump when scrolling up.
+  // #scrollAnchor holds that flow slot while the bar is pinned, so its live rect IS the answer.
+  // Read live, not snapshotted at pin time: a snapshot taken before the focus scroll settled
+  // was stale by ~300px and planted the bar mid-screen. Unlike a fixed element's rect, an
+  // in-flow rect here reads against the visible top, so it needs no regime correction.
+  const naturalTop = ()=> Math.max(0, scrollAnchorEl.getBoundingClientRect().top);
+  // offsetTop, with compositor noise removed — see the deadband note in trackTop.
+  // Where the viewport is panned to. Used to POSITION the bar, so it must be the true value:
+  // a keyboard pan can legitimately be small (20px measured, when the page needed only a
+  // nudge to reveal the field), and rounding that to 0 pinned the bar 20px above the visible
+  // top, where it stayed. Only the bounce TRIGGER below needs a threshold, and it has its own.
+  const panOffset = ()=> Math.max(0, Math.round(vv.offsetTop));
+  // How far the slot must be below the top before the bar is handed back to sticky. Swapping at
+  // literally >0 let a 1-3px rounding/stale read flap the bar to plain sticky while the keyboard
+  // was up — the state where iOS sticky is unreliable — and that is the regime a *tiny* scroll
+  // sits in. A few px of hysteresis keeps the pin until the slot has really moved.
+  const STICK_EPS = 4;
+  // STICK_EPS governs the swap DECISION only — never where the bar is placed. Placement always
+  // uses the true naturalTop(), so the pinned position and the sticky position are the same
+  // number and swapping between them moves nothing. Rounding the placement down to 0 inside the
+  // threshold made the two disagree by up to STICK_EPS: releasing the pin dropped the bar onto
+  // its real slot (a flash slightly below), and taking the pin lifted it out from under a caret
+  // iOS had already drawn (the cursor sitting slightly above the field).
+  // How far offsetTop must leave its resting value to count as a real viewport pan rather than
+  // compositor jitter. A keyboard pan moves several hundred px; the jitter is a few.
+  const PAN_EPS = 24;
+  const goSticky = ()=>{
+    if(!pinned) return;
+    pinned=false; closing=false; panHold=false;
+    searchbarEl.classList.remove('pinned');
+    searchbarEl.style.top = '';           // back to the CSS sticky top:0
+    scrollAnchorEl.style.height = '0';
+  };
+  const pinFixed = (t)=>{
+    if(!pinned){
+      pinned=true;
+      scrollAnchorEl.style.height = searchbarEl.offsetHeight + 12 + 'px';  // bar height + margin
+      searchbarEl.classList.add('pinned');
+    }
+    closing=false; panHold=false;
+    restOff = t;
+    searchbarEl.style.top = (t + naturalTop())+'px';
+    // Start the tracking loop on EVERY pin, not just the unpinned->pinned transition. A pin
+    // that arrived while the loop was stopped (re-pinning during a bounce) otherwise left the
+    // bar frozen at whatever top it was given, so it stopped following the pan.
+    if(!trackRaf) trackRaf=requestAnimationFrame(trackTop);
+  };
+  // The blur (keyboard dismiss) starts the close. CRUCIAL iOS quirk: while the keyboard is
+  // stable-up, a fixed element is positioned relative to the LAYOUT viewport, so top:offsetTop
+  // lands it at the visible top. But the moment the keyboard starts CLOSING, iOS positions
+  // fixed relative to the (shrinking) VISUAL viewport — so the same top:offsetTop puts the bar
+  // offsetTop px DOWN = mid-screen (measured: barTop jumps 0->300 at close start with top and
+  // offsetTop both unchanged). During the close the correct top is 0. Hold it there until the
+  // keyboard is fully gone, then hand to plain sticky.
+  // The blur IS the moment the close begins, and iOS switches fixed to visual-relative right
+  // then — so hold top:0 from here. Waiting for offsetTop to visibly deviate instead does not
+  // work: at close start off is still ~restOff, so the flip fires late and the bar renders
+  // restOff px down = mid-screen (seen on video during a swipe-dismiss). The release below
+  // covers the case where the close does not actually follow.
+  searchInput.addEventListener('blur', ()=>{
+    // Pin if we are not already: the bar is now left plain sticky whenever its flow slot is on
+    // screen, so a dismiss can start from the unpinned state — and iOS breaks sticky on the
+    // root scroller mid-close, which would drop the bar mid-screen. pinFixed clears `closing`,
+    // so set it after.
+    if(!pinned) pinFixed(panOffset());
+    closing=true; searchbarEl.style.top=naturalTop()+'px';
+    // Restart the stillness count. It measures "the viewport is not moving, so no close is
+    // actually happening" — but before the blur the viewport had been at rest with the keyboard
+    // up, so the count was already way past the threshold and the safety net fired on the very
+    // next frame, undoing the hold and snapping the bar offsetTop px DOWN for ~4 frames. The
+    // count has to start from the blur, since only stillness AFTER it means anything.
+    stillFrames=0;
+  });
+  let trackRaf=0, lastOff=-1, lastVH=-1, stillFrames=0;
+  const trackTop=()=>{
+    if(!pinned){ trackRaf=0; return; }
+    const off=Math.max(0,Math.round(vv.offsetTop));
+    // Stillness means the viewport is not moving in ANY way, so height counts too: a keyboard
+    // close can restore vv.height while offsetTop holds, and that is motion, not stillness.
+    const vh=Math.round(vv.height);
+    if(off===lastOff && vh===lastVH) stillFrames++; else { stillFrames=0; lastOff=off; lastVH=vh; }
+    // Slot back on screen (scrolling UP toward the header): the bar belongs in the flow, and
+    // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
+    // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
+    // a chase, and a chase always lands a frame late: that was the jitter when sliding up.
+    // So hand it back and go static.
+    // This applies even mid-close. The sticky bug we pin against only affects the bar while it
+    // is STUCK; with its slot visible the bar is in ordinary flow, so there is nothing for
+    // sticky to get wrong. Excluding `closing` here meant an up-swipe (which both dismisses and
+    // scrolls) stayed pinned and chased the slot — measured barTop trailing anchorTop by one
+    // frame the whole way, which is exactly the jitter.
+    if(naturalTop() > STICK_EPS){ goSticky(); trackRaf=0; return; }
+    // Two different reasons to hold top:0, with different exits — conflating them broke both.
+    // `closing`: a blur fired, the keyboard is on its way out. Hold until it is fully gone. It
+    // must NOT release on "offsetTop is near rest", because that is exactly the state at close
+    // start, and releasing there is what put the bar mid-screen.
+    if(closing){
+      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
+      // Safety net only: blurred but the keyboard never actually left (iOS can keep it up).
+      // The threshold has to be generous, because "still" does NOT mean "no close is coming":
+      // after a tap-dismiss (the keyboard's own Done/checkmark) iOS leaves offsetTop AND
+      // vv.height completely unchanged for ~230ms before it starts animating. At 12 frames this
+      // tripped in that dead time and snapped the bar down by offsetTop for a frame, right
+      // before the close began — the jump when using the checkmark. A real close always gets
+      // moving well within 1s, so only past that does stillness really mean nothing is coming.
+      if(keyboardUp() && stillFrames>=60){
+        closing=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
+      } else {
+        searchbarEl.style.top=naturalTop()+'px';                     // fixed is visual-relative now
+      }
+      trackRaf=requestAnimationFrame(trackTop);
+      return;
+    }
+    // `panHold`: no blur — a bounce or the keyboard OPENING pan. Here the viewport does return
+    // to rest with the keyboard still up, so release on settle. Waiting only for stillness left
+    // the bar parked offsetTop above the screen while the viewport kept twitching during a
+    // keyboard-up scroll — that is the "bar disappears" report.
+    if(panHold){
+      if(!keyboardUp() && off===0){ goSticky(); trackRaf=0; return; }
+      if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
+        panHold=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
+      } else {
+        searchbarEl.style.top=naturalTop()+'px';
+      }
+      trackRaf=requestAnimationFrame(trackTop);
+      return;
+    }
+    // Unpin to plain sticky only once the keyboard has FULLY closed (height restored), not
+    // the instant offsetTop first reads 0 — during the close offsetTop briefly hits 0 while
+    // the height is still shrunk, and unpinning there left the bar sticky mid-close, which
+    // mispositioned it to mid-screen. Scrolling is blocked while the keyboard is up, so
+    // holding the fixed pin through the whole close is safe (no scroll to drift against).
+    // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
+    // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
+    if(off===0 && !keyboardUp()){ goSticky(); trackRaf=0; return; }
+    // offsetTop has left its resting value => the viewport has STARTED panning: the keyboard
+    // is being dragged away by iOS's native scroll-to-dismiss (or is closing). iOS switches
+    // fixed to VISUAL-relative the instant a pan begins, so the flush position becomes a
+    // static top:0 — and a static value is the whole point: the compositor then carries the
+    // bar, instead of JS rewriting top every frame and landing a frame behind (that lag was
+    // the bounce). Same hold the bottom rubber-band uses. Flip only once the pan is REAL,
+    // never on touch: doing it while the keyboard still sat stable-up (fixed still
+    // layout-relative) put top:0 a full offsetTop ABOVE the screen, measured at -382.
+    // PAN_EPS, not a couple of px: the compositor jitters offsetTop by a few px during an
+    // ordinary keyboard-up scroll, and treating that as a pan flipped the bar to top:0 while
+    // the keyboard was still stable-up (fixed still layout-relative) = bar off-screen.
+    if(Math.abs(off-restOff)>PAN_EPS){
+      panHold=true; searchbarEl.style.top=naturalTop()+'px';
+      trackRaf=requestAnimationFrame(trackTop); return;
+    }
+    const want=(off+naturalTop())+'px';
+    if(searchbarEl.style.top!==want) searchbarEl.style.top=want;
+    trackRaf=requestAnimationFrame(trackTop);
+  };
+  let scrollAfterSettle=false;   // see the searchClose handler
+  // keyboard up = the layout is (or is about to be) in its shifted state
+  const keyboardUp = ()=> !!vv && (window.innerHeight - vv.height) > 120;
+  if(vv){
+    let settleTimer=null, armedScrollY=0;
+    function arm(){
+      clearTimeout(settleTimer);
+      armedScrollY = window.scrollY;
+      settleTimer = setTimeout(onSettled, 120);
+    }
+    function onSettled(){
+      settleTimer=null;
+      // Deceleration fires scroll events sparsely, so 120ms of event silence can pass
+      // while the page is still creeping — pinning then, and unpinning on the next event,
+      // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
+      // has actually held, not merely the events.
+      if(Math.abs(window.scrollY - armedScrollY) > 1){ arm(); return; }
+      // Pin to fixed ONLY when there's an actual viewport pan to correct (offsetTop well
+      // above 0). With the instant focus scroll iOS no longer pans, so offsetTop stays ~0
+      // and the bar just stays plain sticky — never switching fixed<->sticky, which is the
+      // switch that flickered. The pin remains a fallback for the case iOS pans anyway.
+      // Pin whenever the keyboard is up, even with offsetTop 0 (the usual case — the instant
+      // focus scroll means iOS never pans). The old `offsetTop > 24` guard left the bar plain
+      // sticky in exactly that case, and iOS breaks sticky on the root scroller while the
+      // keyboard closes, dropping the bar mid-screen. Pinned at top:=offsetTop it is in the
+      // right place either way, and blur can then hold it at top:0 through the close.
+      // ...but only once the flow slot is scrolled past. If the slot is still on screen the
+      // bar's correct place IS its flow position, which sticky gives natively — pinning there
+      // means chasing it per frame, which jitters.
+      // A focus scroll is in flight, so the slot is still moving and any decision made now is
+      // made against a stale value. Re-arm rather than decide: arm() re-checks in 120ms, and
+      // focusSettling clears within ~130ms, so this defers at most a pass or two.
+      if(focusSettling){ arm(); return; }
+      // The post-reveal adjustment: iOS's native reveal leaves the field visible above the
+      // keyboard but not necessarily at the top. Once everything has settled, one smooth
+      // scroll brings the slot the rest of the way. Only while the keyboard is up, only
+      // when the slot is meaningfully off, and at most once per focus (armed on focus),
+      // so it can never loop or fight a user scroll that follows.
+      if(adjustPending && keyboardUp() && naturalTop() > STICK_EPS){
+        adjustPending=false;
+        scrollToResults();
+        arm();               // settle again after the adjustment, then pin below
+        return;
+      }
+      if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
+      else goSticky();
+      // a scroll-to-results requested mid-transition runs now, against the FINAL layout
+      if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
+    }
+    function onChange(){
+      // A viewport pan with NO keyboard is a rubber-band bounce (the bottom one stretches
+      // offsetTop to ~215 and eases it back). Sticky slides away with the content during it,
+      // so pin and track the pan — top:=offsetTop holds the bar flush the whole bounce.
+      // Detecting it by offsetTop rather than by "scrolled past the end" matters: pinning
+      // swaps the bar out of flow for #scrollAnchor, which moves the page's own end, so a
+      // scrollY-vs-scrollHeight test flips false mid-bounce and drops the tracking.
+      // Pin at top:0, NOT top:=offsetTop. During a pan iOS positions fixed relative to the
+      // VISUAL viewport, so top:0 is flush at the visible top — the same rule as the keyboard
+      // close. top:=offsetTop instead pushed the bar offsetTop px DOWN the screen (~530px,
+      // clearly mid-screen on video) while getBoundingClientRect still reported 0, because the
+      // rect API answers in LAYOUT coordinates during a pan. Trust the video, not the rect.
+      // Then reuse the `closing` hold: keep top:0 until the pan unwinds, then hand to sticky.
+      // A threshold, not any nonzero value: this is the one trigger that took any nudge
+      // value as a bounce. Scrolling DOWN on a real device also collapses Safari's toolbar,
+      // which perturbs the visual viewport by a few px (traces show vv.height overshooting
+      // innerHeight, 754 vs 714). Reading that as a rubber-band pinned the bar at top:0 on the
+      // visual-relative assumption while it was still layout-relative, shifting it a few px —
+      // a thin gap, only while scrolling down, and only when the toolbar transition coincides.
+      // A real bounce reaches ~200px, so requiring PAN_EPS costs it nothing.
+      // ...and not while a focus scroll is in flight. This test reads "viewport panned but no
+      // keyboard", which is also true of the keyboard OPENING: keyboardUp() needs the height to
+      // shrink past 120px, and offsetTop crosses PAN_EPS well before that. Misread as a bounce,
+      // it calls pinFixed(0) => top = 0 + naturalTop(), and mid-focus-scroll naturalTop() is
+      // still the PRE-scroll slot. So the bar renders exactly its old slot distance below the
+      // top, then snaps back when the scroll lands: a jump whose size equals the scroll
+      // distance, which is precisely what was reported. Only from above (from below the slot is
+      // already ~0, so the same misfire places the bar at 0 and shows nothing), and only
+      // sometimes (it depends whether the pan crosses PAN_EPS before the scroll lands).
+      // The flag clears ~130ms in, while the keyboard animates for ~300ms, so a genuine bounce
+      // arriving later is unaffected — and by then naturalTop() is settled, which is the only
+      // thing that made this harmful.
+      if(!focusSettling && !closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
+      // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
+      // bar to sticky whenever the slot is visible, so this is the other half of that swap.
+      else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
+      // top-tracking + the unpin-at-offsetTop-0 are handled per-frame by trackTop (rAF).
+      // Just keep the settle timer armed so onSettled fires when everything stops.
+      arm();
+    }
+    vv.addEventListener('resize', onChange);
+    vv.addEventListener('scroll', onChange);
+    // Ordinary page scrolling fires neither vv event, so without this the settle timer
+    // could expire MID-SCROLL and pin the bar, and the next viewport twitch would unpin
+    // it. Any page scroll while the bar is pinned or a settle is pending counts as motion.
+    window.addEventListener('scroll', ()=>{
+      if(pinned || settleTimer || keyboardUp() || Math.round(vv.offsetTop) > 0) onChange();
+    }, {passive:true});
+  }
 
   // No JS touches the glass. There was machinery here that swapped the .glass div for a
   // fresh clone to rebuild its backdrop layer; it was making the whole bar blink out. The
@@ -938,60 +1149,36 @@
   // element paints nothing until the compositor builds its layer. Removing the div, even
   // for a frame, therefore removes the bar. The glass is now pure CSS and permanent.
 
-  // Tapping the field scrolls the bar to the top INSTANTLY. A smooth scroll animates, and
-  // iOS runs its own scroll-into-view the moment the keyboard shows — mid-animation the
-  // input isn't at the top yet, so iOS pans the visual viewport (offsetTop jumps up) to
-  // reveal it. That pan is the whole reason the bar must pin to fixed and later hand back
-  // to sticky, and that handoff is what flickered. Landing the input at the top in ONE
-  // frame, before iOS looks, means it never pans — offsetTop stays ~0, the pin never moves
-  // the bar, and the fixed->sticky handoff is a true no-op at the same position.
-  // Deliberately no growPadForWorstCase() here. Focus doesn't shrink the grid, so there's
-  // nothing to make room for — render() already grew the pad when the filter changed it.
-  // Scroll BEFORE focus, not just on it. iOS runs its own scroll-into-view on focus, computed
-  // from geometry captured at the tap — when, focusing from above, the field was still its
-  // full slot distance down the page. Our focus-time scroll then races that: if iOS captures
-  // first, it re-runs its reveal from the stale geometry and drags scrollY back toward the
-  // pre-scroll value before returning — seen as the bar dropping to EXACTLY its old slot
-  // position and snapping back. (That displacement equaling the scroll distance is what
-  // identifies the page scroll, not the bar machinery, as the mover: a sticky bar sits there
-  // only when scrollY is back at ~0.) From below the bar is already stuck at the visual top
-  // when the tap lands, iOS sees nothing to reveal and stands down — one scroller, never a
-  // fight, which is why that direction never jittered.
-  // NOT via a scroll in mousedown: the synthesized click is re-hit-tested at dispatch, so the
-  // card that slides under the tap point receives it — measured on video actually opening that
-  // plant's modal. Instead take over the whole tap at touchend: preventDefault cancels the
-  // click synthesis outright (nothing left to re-target), then scroll, then focus with the
-  // browser's own scroll-into-view suppressed — no second scroller even exists. Only for a
-  // stationary tap on the unfocused field: a scroll gesture ending on the field keeps its
-  // default (it produces no click anyway), and a caret tap on the focused field keeps iOS's
-  // native caret handling.
-  let tapX=0, tapY=0, tapMoved=false;
-  searchInput.addEventListener('touchstart', e=>{
-    const t=e.touches[0]; tapX=t.clientX; tapY=t.clientY; tapMoved=false;
-  }, {passive:true});
-  searchInput.addEventListener('touchmove', e=>{
-    const t=e.touches[0];
-    if(Math.abs(t.clientX-tapX)>8 || Math.abs(t.clientY-tapY)>8) tapMoved=true;
-  }, {passive:true});
-  searchInput.addEventListener('touchend', e=>{
-    if(tapMoved || document.activeElement===searchInput) return;
-    e.preventDefault();
-    scrollToResults(true);
-    searchInput.focus({preventScroll:true});
-  }, {passive:false});
-  // Kept for focus arriving any other way (desktop click, tab key, assistive tech) — after
-  // the touchend path this is a no-op: the forced pass re-scrolls to where the page already
-  // is, and the correction passes stand down inside their deadband.
-  searchInput.addEventListener('focus', ()=>scrollToResults(true));
+  // The tap on the search field is left ENTIRELY native — no programmatic scroll before,
+  // at, or racing the focus. Every earlier variant scrolled the bar to the top around focus
+  // time, and each lost a different race to iOS: the browser saves the scroll position when
+  // the tap begins, restores it at keyboard-show, and re-reveals the field from that stale
+  // geometry — and when the field has meanwhile been moved to the top, that reveal comes out
+  // as a visual-viewport PAN (offsetTop ~337). The pan is the poison: a pinned bar must then
+  // carry top:=offsetTop, and during a checkmark dismissal iOS freezes JS for ~400ms while
+  // animating the pan away, dragging the bar down the screen with it — the mid-screen slide,
+  // unfixable by any code that is not running. A native, unfought reveal of a field on a page
+  // with scroll room is done by SCROLLING the page, which leaves offsetTop at 0 — and with
+  // offsetTop 0 the pinned top is 0, which renders flush in BOTH fixed regimes, so even the
+  // JS-frozen close has nothing to slide. The bar is brought the rest of the way to the top
+  // by one smooth adjustment AFTER the keyboard has settled (see onSettled), when iOS is
+  // done and there is nobody left to fight.
+  let adjustPending=false;
+  searchInput.addEventListener('focus', ()=>{ adjustPending=true; });
+  searchInput.addEventListener('blur',  ()=>{ adjustPending=false; });
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
   document.getElementById('searchClose').addEventListener('click', ()=>{
     searchInput.value=''; state.q=''; searchBox.classList.remove('hastext');
     render(); searchInput.blur();
-    // The scroller's geometry is keyboard-independent (the keyboard shrinks only the visual
-    // viewport), so the scroll can be computed immediately — nothing is about to shift.
-    scrollToResults();
+    // If the keyboard is up (pinned OR mid-transition sticky — e.g. X right after a
+    // down-and-up scroll, before the settle re-pinned), the blur is about to close it:
+    // viewport height, spacer and bar position all about to change. A scroll computed NOW
+    // targets a layout that's about to shift and lands offset (bar mid-screen / lines
+    // above). Defer it to onSettled so it runs against the final layout instead.
+    if(pinned || keyboardUp()) scrollAfterSettle=true;
+    else scrollToResults();
   });
 
   // loading="lazy" keeps the first paint cheap, but it also means a card sitting far
