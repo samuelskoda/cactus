@@ -45,22 +45,19 @@
   /* Sticky bar: a search field + a separate Filters button */
   .searchbar{position:sticky;top:0;z-index:20;
     border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}
-  /* SEARCH MODE: the hybrid that keeps browsing on the native root scroller (pull-to-
-     refresh, status-bar tap) while making every focus geometrically a "from below" focus —
-     the one case that never glitched. Entering search pins the bar to the top as a fixed
-     overlay WITHOUT scrolling anything, and turns <main> into an inner-scrolling results
-     panel beneath it. The root is frozen and never scrolled, so iOS has nothing to save,
-     restore, or reveal at keyboard-show — and the field already sits at the visual top, so
-     there is no reveal pan. With offsetTop 0, the fixed bar renders flush in both of iOS's
-     fixed-positioning regimes, which makes even the JS-frozen checkmark dismissal unable
-     to move it. The keyboard can only ever exist inside this mode. */
+  /* SEARCH FREEZE: keeps browsing on the native root scroller (pull-to-refresh,
+     status-bar tap) while disarming the keyboard structurally. Measured law of this
+     configuration: the keyboard-up visual-viewport pan equals min(scrollY, keyboard
+     height) — it follows the SCROLL POSITION. The pan is what a checkmark dismissal
+     animates away while iOS freezes JS, dragging any fixed/pinned bar down mid-screen.
+     So the disarm is scrollY == 0 for the whole keyboard episode: entering search
+     collapses the hero, which puts the bar's natural in-flow slot AT the document top —
+     the classic look (bar on top, results under it) at scrollY 0, with the bar plain
+     sticky. No fixed positioning, no pan, no regimes: there is nothing left for the
+     frozen close to move. The keyboard can only ever exist inside this mode; the freeze
+     (overflow:hidden) keeps everything still while it is up. */
   body.searchmode{overflow:hidden}
-  body.searchmode .searchbar{position:fixed;top:0;left:0;right:0;margin-bottom:0}
-  body.searchmode main{position:fixed;left:0;right:0;bottom:0;overflow-y:auto;
-    -webkit-overflow-scrolling:touch;background:var(--bg);z-index:15;
-    max-width:none;padding-bottom:24px}
-  /* the hero peeking around the panel edges would look torn — hide it while searching */
-  body.searchmode header.hero{visibility:hidden}
+  body.searchmode header.hero{display:none}
   /* While the keyboard is open, iOS Safari breaks position:sticky — the bar stops sticking
      and scrolls off with the page (measured: barTop -1322 at scrollY 1622, offsetTop 0,
      visualViewport height 362 vs layout 739). position:fixed does NOT have this bug, and
@@ -1180,23 +1177,28 @@
   // under the finger — the verified-safe pattern) and focus is ours, with the browser's
   // scroll-into-view suppressed; it would have nothing to do anyway, the field is already
   // at the visual top, which is exactly the point.
-  const mainEl = document.querySelector('main');
   const inSearchMode = ()=> document.body.classList.contains('searchmode');
+  const frozenY = 0;   // search mode lives at the document top, always — that IS the disarm
   function enterSearchMode(){
     if(inSearchMode()) return;
-    document.body.classList.add('searchmode');
-    mainEl.style.top = searchbarEl.offsetHeight + 'px';   // panel starts under the bar, whatever its height
-    mainEl.scrollTop = 0;
+    document.body.classList.add('searchmode');            // hero collapses: bar's slot is now the top
+    window.scrollTo({top: 0, behavior: 'instant'});
   }
   function exitSearchMode(){
     if(!inSearchMode()) return;
     document.body.classList.remove('searchmode');
     searchbarEl.style.top = '';
-    mainEl.style.top = '';
-    // Land the familiar end state: bar sticky at the top, results under it. The keyboard is
-    // fully closed by the time this runs, so a root scroll here has nothing to race.
+    // hero is back above the bar — land the classic end state: bar sticky at the top,
+    // results under it. Keyboard is fully closed by now; nothing left to race.
     scrollToResults(true);
   }
+  // The freeze means nothing should ever scroll the root while searching — but iOS's
+  // keyboard-show restore has been seen scrolling even a frozen root. One deadbanded
+  // instant re-assert keeps the results exactly where they were put.
+  addEventListener('scroll', ()=>{
+    if(!inSearchMode()) return;
+    if(Math.abs(window.scrollY - frozenY) > 8) window.scrollTo({top: frozenY, behavior:'instant'});
+  }, {passive:true});
   // Insurance, not machinery: search mode's invariant is offsetTop 0 (nothing to reveal,
   // nothing restored), but if iOS ever pans the viewport anyway (rotation, dictation, an
   // OS surprise), a top:0 bar renders exactly -offsetTop off-screen. Follow the pan on the
@@ -1207,7 +1209,6 @@
       if(!inSearchMode()) return;
       const off = Math.max(0, Math.round(window.visualViewport.offsetTop));
       searchbarEl.style.top = off ? off+'px' : '';
-      mainEl.style.top = (off + searchbarEl.offsetHeight) + 'px';
     };
     window.visualViewport.addEventListener('resize', healPan);
     window.visualViewport.addEventListener('scroll', healPan);
