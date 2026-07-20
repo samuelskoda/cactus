@@ -648,10 +648,20 @@
     // from above. Overshooting puts both directions on the clamped side. It is invisible: at or
     // past the slot the bar sits at the top either way.
     const OVERSHOOT = 6;
-    const doScroll=()=>{
+    // How far off the slot has to be before a CORRECTION pass will move the page. The first
+    // pass always runs; the later two exist only to beat iOS's own scroll-into-view, and iOS
+    // usually lands somewhere perfectly acceptable a handful of px away. Re-scrolling for that
+    // yanks the page back under the user — a visible jump, and an intermittent one, since it
+    // depends on whether iOS's scroll landed before or after our pass. It can only happen when
+    // there was a real scroll to do, i.e. when focusing from ABOVE the bar; from below the slot
+    // is already at the top, the passes are no-ops, and nothing ever jumps. That is exactly the
+    // asymmetry reported: intermittent, only from above, never from below.
+    const SETTLE_EPS = 8;
+    const doScroll=(force)=>{
       if(takenOver) return;
-      const target = window.scrollY + anchor.getBoundingClientRect().top + OVERSHOOT;
-      window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
+      const delta = anchor.getBoundingClientRect().top + OVERSHOOT;
+      if(force!==true && Math.abs(delta) <= SETTLE_EPS) return;   // close enough — leave it alone
+      window.scrollTo({top: Math.max(0, window.scrollY + delta), behavior: instant===true ? 'instant' : 'smooth'});
     };
     // Only the focus path (instant) races the keyboard; filter/menu scrolls have no keyboard.
     if(instant===true){
@@ -661,8 +671,8 @@
       clearTimeout(focusSettleTimer);
       focusSettleTimer=setTimeout(()=>{ focusSettling=false; }, 350);
     }
-    doScroll();
-    requestAnimationFrame(doScroll);
+    doScroll(true);                      // the real scroll — always runs
+    requestAnimationFrame(()=>doScroll());   // wrapped: rAF passes a timestamp, never `force`
     setTimeout(()=>{
       doScroll();
       removeEventListener('wheel', claim, opts);
