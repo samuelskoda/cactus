@@ -671,6 +671,25 @@
       clearTimeout(focusSettleTimer);
       focusSettleTimer=setTimeout(()=>{ focusSettling=false; }, 350);
     }
+    // The keyboard-show restore. WebKit saves the scroll position when the tap begins and
+    // RESTORES it the moment the keyboard's geometry arrives — measured: scrollY 354 -> 0
+    // (the exact pre-tap value) in the same 8ms sample as vv.height shrinking, bar rendered
+    // in flow at its old slot for ~one frame, then corrected. That restore undoes any scroll
+    // made between tap and keyboard-show, ours included; focus({preventScroll}) does not
+    // suppress it (it only skips scroll-into-view). It is also why the flash needs a real
+    // scroll to exist: from below the saved position already equals the target, so the
+    // restore moves nothing. So: re-assert the target on the very events the restore arrives
+    // with (vv resize, and the scroll event it emits) — same turn, before paint reflects it.
+    // takenOver still wins: a user swiping away claims the page and the corrector stands down.
+    if(instant===true && vv){
+      const fix=()=>doScroll();          // deadbanded: no-op unless the slot is really off
+      vv.addEventListener('resize', fix);
+      addEventListener('scroll', fix, opts);
+      setTimeout(()=>{
+        vv.removeEventListener('resize', fix);
+        removeEventListener('scroll', fix, opts);
+      }, 900);
+    }
     doScroll(true);                      // the real scroll — always runs
     requestAnimationFrame(()=>doScroll());   // wrapped: rAF passes a timestamp, never `force`
     setTimeout(()=>{
@@ -1076,17 +1095,6 @@
       // made against a stale value. Re-arm rather than decide: arm() re-checks in 120ms, and
       // focusSettling clears within ~130ms, so this defers at most a pass or two.
       if(focusSettling){ arm(); return; }
-      // The post-reveal adjustment: iOS's native reveal leaves the field visible above the
-      // keyboard but not necessarily at the top. Once everything has settled, one smooth
-      // scroll brings the slot the rest of the way. Only while the keyboard is up, only
-      // when the slot is meaningfully off, and at most once per focus (armed on focus),
-      // so it can never loop or fight a user scroll that follows.
-      if(adjustPending && keyboardUp() && naturalTop() > STICK_EPS){
-        adjustPending=false;
-        scrollToResults();
-        arm();               // settle again after the adjustment, then pin below
-        return;
-      }
       if(keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
       else goSticky();
       // a scroll-to-results requested mid-transition runs now, against the FINAL layout
@@ -1149,23 +1157,51 @@
   // element paints nothing until the compositor builds its layer. Removing the div, even
   // for a frame, therefore removes the bar. The glass is now pure CSS and permanent.
 
-  // The tap on the search field is left ENTIRELY native — no programmatic scroll before,
-  // at, or racing the focus. Every earlier variant scrolled the bar to the top around focus
-  // time, and each lost a different race to iOS: the browser saves the scroll position when
-  // the tap begins, restores it at keyboard-show, and re-reveals the field from that stale
-  // geometry — and when the field has meanwhile been moved to the top, that reveal comes out
-  // as a visual-viewport PAN (offsetTop ~337). The pan is the poison: a pinned bar must then
-  // carry top:=offsetTop, and during a checkmark dismissal iOS freezes JS for ~400ms while
-  // animating the pan away, dragging the bar down the screen with it — the mid-screen slide,
-  // unfixable by any code that is not running. A native, unfought reveal of a field on a page
-  // with scroll room is done by SCROLLING the page, which leaves offsetTop at 0 — and with
-  // offsetTop 0 the pinned top is 0, which renders flush in BOTH fixed regimes, so even the
-  // JS-frozen close has nothing to slide. The bar is brought the rest of the way to the top
-  // by one smooth adjustment AFTER the keyboard has settled (see onSettled), when iOS is
-  // done and there is nobody left to fight.
-  let adjustPending=false;
-  searchInput.addEventListener('focus', ()=>{ adjustPending=true; });
-  searchInput.addEventListener('blur',  ()=>{ adjustPending=false; });
+  // Tapping the field scrolls the bar to the top INSTANTLY. A smooth scroll animates, and
+  // iOS runs its own scroll-into-view the moment the keyboard shows — mid-animation the
+  // input isn't at the top yet, so iOS pans the visual viewport (offsetTop jumps up) to
+  // reveal it. That pan is the whole reason the bar must pin to fixed and later hand back
+  // to sticky, and that handoff is what flickered. Landing the input at the top in ONE
+  // frame, before iOS looks, means it never pans — offsetTop stays ~0, the pin never moves
+  // the bar, and the fixed->sticky handoff is a true no-op at the same position.
+  // Deliberately no growPadForWorstCase() here. Focus doesn't shrink the grid, so there's
+  // nothing to make room for — render() already grew the pad when the filter changed it.
+  // Scroll BEFORE focus, not just on it. iOS runs its own scroll-into-view on focus, computed
+  // from geometry captured at the tap — when, focusing from above, the field was still its
+  // full slot distance down the page. Our focus-time scroll then races that: if iOS captures
+  // first, it re-runs its reveal from the stale geometry and drags scrollY back toward the
+  // pre-scroll value before returning — seen as the bar dropping to EXACTLY its old slot
+  // position and snapping back. (That displacement equaling the scroll distance is what
+  // identifies the page scroll, not the bar machinery, as the mover: a sticky bar sits there
+  // only when scrollY is back at ~0.) From below the bar is already stuck at the visual top
+  // when the tap lands, iOS sees nothing to reveal and stands down — one scroller, never a
+  // fight, which is why that direction never jittered.
+  // NOT via a scroll in mousedown: the synthesized click is re-hit-tested at dispatch, so the
+  // card that slides under the tap point receives it — measured on video actually opening that
+  // plant's modal. Instead take over the whole tap at touchend: preventDefault cancels the
+  // click synthesis outright (nothing left to re-target), then scroll, then focus with the
+  // browser's own scroll-into-view suppressed — no second scroller even exists. Only for a
+  // stationary tap on the unfocused field: a scroll gesture ending on the field keeps its
+  // default (it produces no click anyway), and a caret tap on the focused field keeps iOS's
+  // native caret handling.
+  let tapX=0, tapY=0, tapMoved=false;
+  searchInput.addEventListener('touchstart', e=>{
+    const t=e.touches[0]; tapX=t.clientX; tapY=t.clientY; tapMoved=false;
+  }, {passive:true});
+  searchInput.addEventListener('touchmove', e=>{
+    const t=e.touches[0];
+    if(Math.abs(t.clientX-tapX)>8 || Math.abs(t.clientY-tapY)>8) tapMoved=true;
+  }, {passive:true});
+  searchInput.addEventListener('touchend', e=>{
+    if(tapMoved || document.activeElement===searchInput) return;
+    e.preventDefault();
+    scrollToResults(true);
+    searchInput.focus({preventScroll:true});
+  }, {passive:false});
+  // Kept for focus arriving any other way (desktop click, tab key, assistive tech) — after
+  // the touchend path this is a no-op: the forced pass re-scrolls to where the page already
+  // is, and the correction passes stand down inside their deadband.
+  searchInput.addEventListener('focus', ()=>scrollToResults(true));
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
   // field × just clears the search text and scrolls back to the top, like unselecting a filter
