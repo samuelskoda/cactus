@@ -671,6 +671,25 @@
       clearTimeout(focusSettleTimer);
       focusSettleTimer=setTimeout(()=>{ focusSettling=false; }, 350);
     }
+    // The keyboard-show restore. WebKit saves the scroll position when the tap begins and
+    // RESTORES it the moment the keyboard's geometry arrives — measured: scrollY 354 -> 0
+    // (the exact pre-tap value) in the same 8ms sample as vv.height shrinking, bar rendered
+    // in flow at its old slot for ~one frame, then corrected. That restore undoes any scroll
+    // made between tap and keyboard-show, ours included; focus({preventScroll}) does not
+    // suppress it (it only skips scroll-into-view). It is also why the flash needs a real
+    // scroll to exist: from below the saved position already equals the target, so the
+    // restore moves nothing. So: re-assert the target on the very events the restore arrives
+    // with (vv resize, and the scroll event it emits) — same turn, before paint reflects it.
+    // takenOver still wins: a user swiping away claims the page and the corrector stands down.
+    if(instant===true && vv){
+      const fix=()=>doScroll();          // deadbanded: no-op unless the slot is really off
+      vv.addEventListener('resize', fix);
+      addEventListener('scroll', fix, opts);
+      setTimeout(()=>{
+        vv.removeEventListener('resize', fix);
+        removeEventListener('scroll', fix, opts);
+      }, 900);
+    }
     doScroll(true);                      // the real scroll — always runs
     requestAnimationFrame(()=>doScroll());   // wrapped: rAF passes a timestamp, never `force`
     setTimeout(()=>{
