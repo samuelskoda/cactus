@@ -630,9 +630,18 @@
     addEventListener('wheel', claim, opts);
     addEventListener('touchstart', claim, opts);
     addEventListener('keydown', claim, opts);
+    // Land a hair PAST the slot, not exactly on it. naturalTop() is max(0, anchorTop), so the
+    // negative side is clamped to 0 and the positive side is not — which is the whole asymmetry
+    // between the two directions. Focusing from BELOW scrolls up and overshoots into the clamped
+    // side, so the slot always reads 0 and the bar always pins; focusing from ABOVE scrolls down
+    // and can stop a couple of px short, leaving the slot positive, so the bar never pins and the
+    // dismiss then starts from sticky, which is broken during a close and drops the bar. Two px
+    // of overshoot puts the downward case on the same forgiving side as the upward one. It is
+    // invisible: at or past the slot, both sticky and the pin place the bar at the top anyway.
+    const OVERSHOOT = 2;
     const doScroll=()=>{
       if(takenOver) return;
-      const target = window.scrollY + anchor.getBoundingClientRect().top;
+      const target = window.scrollY + anchor.getBoundingClientRect().top + OVERSHOOT;
       window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
     };
     doScroll();
@@ -889,8 +898,9 @@
   const pageMoving = ()=> (performance.now() - lastScrollAt) < 150;
   document.addEventListener('touchend',    endTouch, {passive:true, capture:true});
   document.addEventListener('touchcancel', endTouch, {passive:true, capture:true});
-  const PIN_AT   = 4;   // slot within this of the top -> pin (a focus scroll rarely lands exact)
-  const UNPIN_AT = 8;   // slot further than this below -> hand back to sticky
+  const PIN_AT   = 12;  // slot within this of the top -> pin. Generous on purpose: a scroll that
+                        // stops short must still pin, because not pinning loses the close hold.
+  const UNPIN_AT = 20;  // slot further than this below -> hand back to sticky (must exceed PIN_AT)
   // These govern the swap DECISION only — never where the bar is placed. Placement always
   // uses the true naturalTop(), so the pinned position and the sticky position are the same
   // number and swapping between them moves nothing. Rounding the placement down to 0 inside the
