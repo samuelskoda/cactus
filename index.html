@@ -379,8 +379,18 @@
     addEventListener('touchend', repark, {passive:true});
     if(window.visualViewport) window.visualViewport.addEventListener('resize', repark);
     addEventListener('scroll', ()=>{                    // root scrolls only; element scrolls don't reach window
-      if(rootEl.scrollTop === 0 && performance.now() - lastTouchT > 800){
-        scroller.scrollTo({top:0, behavior:'smooth'});
+      if(rootEl.scrollTop === 0){
+        // 500ms, not longer: the gate only exists to exclude a PTR spring-back (which lands
+        // on 0 within moments of its touch), and a longer gate was eating GENUINE taps made
+        // right after scrolling.
+        if(performance.now() - lastTouchT > 500) scroller.scrollTo({top:0, behavior:'smooth'});
+        // Park RIGHT HERE, inside the native scroll's own event dispatch, and regardless of
+        // the gate. Outside a native scroll this root refuses every programmatic scroll
+        // (measured: scrollTo, scrollTop, on html and body, all silently ignored), so the
+        // delayed re-park can fail and strand the root at 0 — where the next tap produces no
+        // event at all. That was "works only once". During a native gesture the attempt is
+        // simply ignored, so this is safe to try unconditionally.
+        park();
       }
       repark();
     }, {passive:true});
