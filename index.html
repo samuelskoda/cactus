@@ -1147,6 +1147,28 @@
   // the bar, and the fixed->sticky handoff is a true no-op at the same position.
   // Deliberately no growPadForWorstCase() here. Focus doesn't shrink the grid, so there's
   // nothing to make room for — render() already grew the pad when the filter changed it.
+  // Scroll BEFORE focus, not just on it. iOS runs its own scroll-into-view on focus, computed
+  // from geometry captured at the tap — when, focusing from above, the field was still its
+  // full slot distance down the page. Our focus-time scroll then races that: if iOS captures
+  // first, it re-runs its reveal from the stale geometry and drags scrollY back toward the
+  // pre-scroll value before returning — seen as the bar dropping to EXACTLY its old slot
+  // position and snapping back. (That displacement equaling the scroll distance is what
+  // identifies the page scroll, not the bar machinery, as the mover: a sticky bar sits there
+  // only when scrollY is back at ~0.) From below the bar is already stuck at the visual top
+  // when the tap lands, iOS sees nothing to reveal and stands down — one scroller, never a
+  // fight, which is why that direction never jittered. So make from-above identical: on a tap
+  // iOS synthesizes mousedown -> focus -> click as one burst after touchend, with the target
+  // locked at the tap — so a scroll in mousedown lands before focus, iOS captures the field
+  // already at the top, and stands down here too. mousedown, not touchstart/pointerdown: those
+  // fire for scroll gestures that merely begin on the field, while the synthesized mousedown
+  // means a committed tap. Guarded so tapping the already-focused field (e.g. to move the
+  // caret) does not yank the page back to the slot.
+  searchInput.addEventListener('mousedown', ()=>{
+    if(document.activeElement!==searchInput) scrollToResults(true);
+  });
+  // Kept as the backstop for focus arriving without a tap (tab key, assistive tech) — after
+  // the mousedown pass this is a no-op: the forced pass re-scrolls to where the page already
+  // is, and the correction passes stand down inside their deadband.
   searchInput.addEventListener('focus', ()=>scrollToResults(true));
   // let the keyboard's Search key dismiss itself
   searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') searchInput.blur(); });
