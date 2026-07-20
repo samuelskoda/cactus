@@ -1101,7 +1101,19 @@
       // visual-relative assumption while it was still layout-relative, shifting it a few px —
       // a thin gap, only while scrolling down, and only when the toolbar transition coincides.
       // A real bounce reaches ~200px, so requiring PAN_EPS costs it nothing.
-      if(!closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
+      // ...and not while a focus scroll is in flight. This test reads "viewport panned but no
+      // keyboard", which is also true of the keyboard OPENING: keyboardUp() needs the height to
+      // shrink past 120px, and offsetTop crosses PAN_EPS well before that. Misread as a bounce,
+      // it calls pinFixed(0) => top = 0 + naturalTop(), and mid-focus-scroll naturalTop() is
+      // still the PRE-scroll slot. So the bar renders exactly its old slot distance below the
+      // top, then snaps back when the scroll lands: a jump whose size equals the scroll
+      // distance, which is precisely what was reported. Only from above (from below the slot is
+      // already ~0, so the same misfire places the bar at 0 and shows nothing), and only
+      // sometimes (it depends whether the pan crosses PAN_EPS before the scroll lands).
+      // The flag clears ~130ms in, while the keyboard animates for ~300ms, so a genuine bounce
+      // arriving later is unaffected — and by then naturalTop() is settled, which is the only
+      // thing that made this harmful.
+      if(!focusSettling && !closing && !keyboardUp() && panOffset() >= PAN_EPS){ pinFixed(0); closing=true; }
       // Scrolled back down past the flow slot with the keyboard up: re-pin. trackTop hands the
       // bar to sticky whenever the slot is visible, so this is the other half of that swap.
       else if(!pinned && keyboardUp() && naturalTop()<=STICK_EPS) pinFixed(panOffset());
