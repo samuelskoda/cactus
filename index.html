@@ -642,6 +642,7 @@
     setTimeout(()=>{
       addEventListener('wheel', claim, opts);
       addEventListener('touchstart', claim, opts);
+      addEventListener('touchmove', claim, opts);
       addEventListener('keydown', claim, opts);
     }, 0);
     // Land a few px PAST the slot, never exactly on it. Every pin/unpin decision keys on
@@ -701,6 +702,7 @@
       doScroll();
       removeEventListener('wheel', claim, opts);
       removeEventListener('touchstart', claim, opts);
+      removeEventListener('touchmove', claim, opts);
       removeEventListener('keydown', claim, opts);
       // One frame later the instant scroll above has been applied, so the slot now reads its
       // settled value and the decision is safe to make. Runs even if the user took over: then
@@ -1200,23 +1202,45 @@
   // default (it produces no click anyway), and a caret tap on the focused field keeps iOS's
   // native caret handling.
   let tapX=0, tapY=0, tapMoved=false;
+  // The from-below porting trick. Focusing from BELOW never glitches because there the
+  // field is already at the visual top when the finger lands — iOS makes its keyboard
+  // reveal/save decision from TAP-TIME geometry, finds nothing to do, and the whole
+  // restore/reveal/pan dance never gets scheduled. Scrolling at touchEND was too late:
+  // the tap had already been measured against the old layout. So scroll at finger-DOWN,
+  // before the tap commits — by the time iOS captures anything, the field has been at the
+  // top for the whole tap, from above exactly as from below. (Also simply faster.)
+  // On a 60ms FUSE, so a scroll DRAG that merely begins on the field doesn't jump the
+  // page: real drags start moving within ~30-60ms and defuse it, while a deliberate tap
+  // holds still much longer than that and still gets the scroll well before tap-commit
+  // (an ultra-fast tap that beats the fuse falls back to the touchend takeover's scroll).
+  // A slow-starting drag that sneaks past the fuse is snapped back the instant it moves;
+  // the correction passes stand down via the touchmove claim, so nothing re-scrolls it.
+  let preT=null, preScrolled=false, preY=0;
   searchInput.addEventListener('touchstart', e=>{
     const t=e.touches[0]; tapX=t.clientX; tapY=t.clientY; tapMoved=false;
-    // The from-below porting trick. Focusing from BELOW never glitches because there the
-    // field is already at the visual top when the finger lands — iOS makes its keyboard
-    // reveal/save decision from TAP-TIME geometry, finds nothing to do, and the whole
-    // restore/reveal/pan dance never gets scheduled. Scrolling at touchEND was too late:
-    // the tap had already been measured against the old layout. So scroll at finger-DOWN,
-    // before the tap commits — by the time iOS captures anything, the field has been at
-    // the top for the whole tap, from above exactly as from below. (Also simply faster.)
-    // The click can't mis-target from this: the touchend takeover below preventDefaults,
-    // so no native click is ever synthesized against the moved layout. Cost: starting a
-    // scroll DRAG on the search field also jumps the page to the results top first.
-    if(document.activeElement !== searchInput) scrollToResults(true);
+    preScrolled=false; preY=window.scrollY;
+    clearTimeout(preT);
+    if(document.activeElement !== searchInput){
+      preT = setTimeout(()=>{
+        if(!tapMoved && document.activeElement !== searchInput){
+          preScrolled=true; scrollToResults(true);
+        }
+      }, 60);
+    }
   }, {passive:true});
   searchInput.addEventListener('touchmove', e=>{
     const t=e.touches[0];
-    if(Math.abs(t.clientX-tapX)>8 || Math.abs(t.clientY-tapY)>8) tapMoved=true;
+    if(Math.abs(t.clientX-tapX)>8 || Math.abs(t.clientY-tapY)>8){
+      if(!tapMoved){
+        tapMoved=true;
+        clearTimeout(preT);
+        if(preScrolled){ preScrolled=false; window.scrollTo({top:preY, behavior:'instant'}); }
+      }
+    }
+  }, {passive:true});
+  searchInput.addEventListener('touchcancel', ()=>{
+    clearTimeout(preT);
+    if(preScrolled){ preScrolled=false; window.scrollTo({top:preY, behavior:'instant'}); }
   }, {passive:true});
   searchInput.addEventListener('touchend', e=>{
     if(tapMoved || document.activeElement===searchInput) return;
