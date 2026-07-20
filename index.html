@@ -630,9 +630,18 @@
     addEventListener('wheel', claim, opts);
     addEventListener('touchstart', claim, opts);
     addEventListener('keydown', claim, opts);
+    // Land a few px PAST the slot, never exactly on it. Every pin/unpin decision keys on
+    // naturalTop(), which is max(0, anchorTop) — clamped below but not above. Arriving from
+    // BELOW leaves anchorTop negative, so naturalTop is a hard 0, nowhere near STICK_EPS, and
+    // the decision is stable. Arriving from ABOVE lands it around 0-6, straddling STICK_EPS, so
+    // the bar flips pinned<->sticky as the scroll settles and each flip toggles a class and the
+    // anchor's height — layout churn, felt as the jitter that only ever appeared when focusing
+    // from above. Overshooting puts both directions on the clamped side. It is invisible: at or
+    // past the slot the bar sits at the top either way.
+    const OVERSHOOT = 6;
     const doScroll=()=>{
       if(takenOver) return;
-      const target = window.scrollY + anchor.getBoundingClientRect().top;
+      const target = window.scrollY + anchor.getBoundingClientRect().top + OVERSHOOT;
       window.scrollTo({top: Math.max(0, target), behavior: instant===true ? 'instant' : 'smooth'});
     };
     doScroll();
