@@ -636,9 +636,14 @@
     let takenOver = false;
     const claim = ()=>{ takenOver = true; };
     const opts = {passive:true};
-    addEventListener('wheel', claim, opts);
-    addEventListener('touchstart', claim, opts);
-    addEventListener('keydown', claim, opts);
+    // Deferred past the current event dispatch: this is now also called from the search
+    // field's TOUCHSTART, and inline registration would let that very touch bubble into
+    // the fresh claim listener — the scroll instantly cancelling its own correction passes.
+    setTimeout(()=>{
+      addEventListener('wheel', claim, opts);
+      addEventListener('touchstart', claim, opts);
+      addEventListener('keydown', claim, opts);
+    }, 0);
     // Land a few px PAST the slot, never exactly on it. Every pin/unpin decision keys on
     // naturalTop(), which is max(0, anchorTop) — clamped below but not above. Arriving from
     // BELOW leaves anchorTop negative, so naturalTop is a hard 0, nowhere near STICK_EPS, and
@@ -1187,6 +1192,17 @@
   let tapX=0, tapY=0, tapMoved=false;
   searchInput.addEventListener('touchstart', e=>{
     const t=e.touches[0]; tapX=t.clientX; tapY=t.clientY; tapMoved=false;
+    // The from-below porting trick. Focusing from BELOW never glitches because there the
+    // field is already at the visual top when the finger lands — iOS makes its keyboard
+    // reveal/save decision from TAP-TIME geometry, finds nothing to do, and the whole
+    // restore/reveal/pan dance never gets scheduled. Scrolling at touchEND was too late:
+    // the tap had already been measured against the old layout. So scroll at finger-DOWN,
+    // before the tap commits — by the time iOS captures anything, the field has been at
+    // the top for the whole tap, from above exactly as from below. (Also simply faster.)
+    // The click can't mis-target from this: the touchend takeover below preventDefaults,
+    // so no native click is ever synthesized against the moved layout. Cost: starting a
+    // scroll DRAG on the search field also jumps the page to the results top first.
+    if(document.activeElement !== searchInput) scrollToResults(true);
   }, {passive:true});
   searchInput.addEventListener('touchmove', e=>{
     const t=e.touches[0];
