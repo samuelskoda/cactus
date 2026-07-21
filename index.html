@@ -1265,6 +1265,29 @@
     // synchronous in this handler or iOS shows no keyboard.
     scrollToResults(true);
     searchInput.focus({preventScroll:true});
+    // The keyboard-show restore, outraced. The save happens at gesture-begin (before this
+    // handler's scroll), so at keyboard-show iOS restores the PRE-scroll position for one
+    // frame; the event-driven corrector puts it back a frame later — a small down-and-up
+    // bump, and the caret gets drawn against the bumped geometry (spawning visibly low).
+    // This guard is proactive instead: rAF runs BEFORE paint, so re-asserting the target
+    // each frame for the keyboard's opening window means the restored frame is corrected
+    // before it can render. On quiet frames it is a no-op compare. Any real user input
+    // stands it down immediately.
+    const target = window.scrollY;
+    let holdT0 = performance.now(), holding = true;
+    const stopHold = ()=>{ holding = false; };
+    addEventListener('touchstart', stopHold, {passive:true, once:true});
+    addEventListener('wheel', stopHold, {passive:true, once:true});
+    const guard = ()=>{
+      if(!holding || performance.now() - holdT0 > 450){
+        removeEventListener('touchstart', stopHold);
+        removeEventListener('wheel', stopHold);
+        return;
+      }
+      if(Math.abs(window.scrollY - target) > 2) window.scrollTo({top: target, behavior: 'instant'});
+      requestAnimationFrame(guard);
+    };
+    requestAnimationFrame(guard);
   }, {passive:false});
   // Kept for focus arriving any other way (desktop click, tab key, assistive tech) — after
   // the touchend path this is a no-op: the forced pass re-scrolls to where the page already
