@@ -671,9 +671,6 @@
     const SETTLE_EPS = 8;
     const doScroll=(force)=>{
       if(takenOver) return;
-      // While the entrance slide is animating, every rect on the page is transform-displaced;
-      // a correction pass reading them would "fix" a scroll that is already correct.
-      if(window.__sliding && force!==true) return;
       const delta = anchor.getBoundingClientRect().top + OVERSHOOT;
       if(force!==true && Math.abs(delta) <= SETTLE_EPS) return;   // close enough — leave it alone
       window.scrollTo({top: Math.max(0, window.scrollY + delta), behavior: instant===true ? 'instant' : 'smooth'});
@@ -1121,8 +1118,6 @@
     }
     function onSettled(){
       settleTimer=null;
-      // Mid-slide, every rect is transform-displaced — re-check after it finishes.
-      if(window.__sliding){ arm(); return; }
       // Deceleration fires scroll events sparsely, so 120ms of event silence can pass
       // while the page is still creeping — pinning then, and unpinning on the next event,
       // was the flicker as a scroll came to a stop. Only settle once the scroll POSITION
@@ -1150,7 +1145,6 @@
       if(scrollAfterSettle){ scrollAfterSettle=false; scrollToResults(); }
     }
     function onChange(){
-      if(window.__sliding){ arm(); return; }
       // A viewport pan with NO keyboard is a rubber-band bounce (the bottom one stretches
       // offsetTop to ~215 and eases it back). Sticky slides away with the content during it,
       // so pin and track the pan — top:=offsetTop holds the bar flush the whole bounce.
@@ -1265,28 +1259,11 @@
     // already done natively and is unaffected.
     e.preventDefault();
     if(tapMoved) return;                               // a drag: no focus, and now no native one either
-    // LAYOUT truth and PIXELS part ways here, deliberately. The scroll must be instant and
-    // complete before focus() — iOS reads the field's position from the settled layout, and
-    // that geometry being final is the flash fix; focus() must also stay synchronous in this
-    // handler or iOS shows no keyboard. But an instant cut is not an organic motion. So:
-    // scroll instantly, then start the VISUALS translated back at the old position and glide
-    // them to rest (~220ms) while the keyboard rises. FLIP, page-scale.
-    const preScrollY = window.scrollY;
+    // The scroll is an instant cut, by choice — a FLIP glide was tried and the user
+    // preferred the immediacy. It must complete before focus() anyway: iOS reads the
+    // field's position from settled layout (the flash fix), and focus() must stay
+    // synchronous in this handler or iOS shows no keyboard.
     scrollToResults(true);
-    const slid = window.scrollY - preScrollY;
-    if(slid > 4){
-      const parts = [document.querySelector('header.hero'), searchbarEl,
-                     document.querySelector('main'), document.querySelector('footer')].filter(Boolean);
-      window.__sliding = true;                          // rects are displaced: corrections stand down
-      for(const el of parts){ el.style.transition='none'; el.style.transform=`translateY(${slid}px)`; }
-      requestAnimationFrame(()=>requestAnimationFrame(()=>{
-        for(const el of parts){ el.style.transition='transform 220ms cubic-bezier(.2,.7,.3,1)'; el.style.transform=''; }
-      }));
-      setTimeout(()=>{
-        for(const el of parts){ el.style.transition=''; el.style.transform=''; }
-        window.__sliding = false;
-      }, 280);
-    }
     searchInput.focus({preventScroll:true});
   }, {passive:false});
   // Kept for focus arriving any other way (desktop click, tab key, assistive tech) — after
