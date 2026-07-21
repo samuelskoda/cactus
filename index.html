@@ -1024,7 +1024,7 @@
     // count has to start from the blur, since only stillness AFTER it means anything.
     stillFrames=0;
   });
-  let trackRaf=0, lastOff=-1, lastVH=-1, lastIH=-1, stillFrames=0;
+  let trackRaf=0, lastOff=-1, lastVH=-1, lastIH=-1, stillFrames=0, releaseReadyT=0;
   const trackTop=()=>{
     if(!pinned){ trackRaf=0; return; }
     const off=Math.max(0,Math.round(vv.offsetTop));
@@ -1039,6 +1039,18 @@
     const vh=Math.round(vv.height), ih=window.innerHeight;
     if(off===lastOff && vh===lastVH && ih===lastIH) stillFrames++;
     else { stillFrames=0; lastOff=off; lastVH=vh; lastIH=ih; }
+    // Release when the keyboard is gone AND the viewport has been calm a few frames — but
+    // calm is a preference, not a requirement. While the user scrolls, Safari's toolbar
+    // oscillates innerHeight continuously, so a stillness-only gate deferred the release
+    // for as long as they kept scrolling: the bar stayed pinned and chased naturalTop the
+    // whole time — the persistent post-dismissal rubber (typed searches surfaced it because
+    // their genuine gestures queue the chrome collapse; an idle tap-out dismissal stayed
+    // calm and released promptly). 500ms after the keyboard is truly gone, release
+    // regardless: whatever the chrome is doing by then, sticky handles it natively.
+    const wantRelease = !keyboardUp() && off===0;
+    if(wantRelease){ if(!releaseReadyT) releaseReadyT = performance.now(); }
+    else releaseReadyT = 0;
+    const canRelease = wantRelease && (stillFrames>=3 || performance.now()-releaseReadyT > 500);
     // Slot back on screen (scrolling UP toward the header): the bar belongs in the flow, and
     // that is exactly where plain sticky puts it — natively, on the compositor, with no JS.
     // Holding the pin here meant recomputing naturalTop() and rewriting top every frame, i.e.
@@ -1055,7 +1067,7 @@
     // must NOT release on "offsetTop is near rest", because that is exactly the state at close
     // start, and releasing there is what put the bar mid-screen.
     if(closing){
-      if(!keyboardUp() && off===0 && stillFrames>=3){ goSticky(); trackRaf=0; return; }
+      if(canRelease){ goSticky(); trackRaf=0; return; }
       // Safety net only: blurred but the keyboard never actually left (iOS can keep it up).
       // The threshold has to be generous, because "still" does NOT mean "no close is coming":
       // after a tap-dismiss (the keyboard's own Done/checkmark) iOS leaves offsetTop AND
@@ -1076,7 +1088,7 @@
     // the bar parked offsetTop above the screen while the viewport kept twitching during a
     // keyboard-up scroll — that is the "bar disappears" report.
     if(panHold){
-      if(!keyboardUp() && off===0 && stillFrames>=3){ goSticky(); trackRaf=0; return; }
+      if(canRelease){ goSticky(); trackRaf=0; return; }
       if(stillFrames>=3 || Math.abs(off-restOff)<=PAN_EPS){
         panHold=false; restOff=off; searchbarEl.style.top=(off+naturalTop())+'px';
       } else {
@@ -1092,7 +1104,7 @@
     // holding the fixed pin through the whole close is safe (no scroll to drift against).
     // offsetTop back to 0 with no keyboard means both the keyboard pan and any rubber-band
     // pan are fully unwound, so the bar's resting spot is exactly sticky's — hand it back.
-    if(off===0 && !keyboardUp() && stillFrames>=3){ goSticky(); trackRaf=0; return; }
+    if(canRelease){ goSticky(); trackRaf=0; return; }
     // offsetTop has left its resting value => the viewport has STARTED panning: the keyboard
     // is being dragged away by iOS's native scroll-to-dismiss (or is closing). iOS switches
     // fixed to VISUAL-relative the instant a pan begins, so the flush position becomes a
